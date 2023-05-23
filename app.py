@@ -71,13 +71,7 @@ def register():
         }
         return jsonify(response), 401
 
-@app.route('/auth/', methods=['POST'])
-def account_settings():
-    data = request.get_json()
-    height = data.get('height')
-    weight = data.get('weight')
-    gender = data.get('gender')
-    activity_level = data.get('activity_level')
+# LOGIN
 
 
 if __name__ == '__main__':
