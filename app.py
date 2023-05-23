@@ -4,7 +4,9 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 from firebase_admin import auth
+from config import secret_key
 import re
+import jwt
 
 # Initialize Firebase
 cred = credentials.Certificate('serviceAccountKey1.json')
@@ -14,11 +16,23 @@ firebase_admin.initialize_app(cred, {
 
 # Initialize Flask
 app = Flask(__name__)
-# CORS(app)
+
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email) is not None
+
+def create_access_token_with_claims(identity, secret_key):
+    additional_claims = {
+        'custom_key': 'hctamirtun'  # Tambahkan klaim kustom sesuai kebutuhan Anda
+    }
+    payload = {
+        'sub': identity,
+        **additional_claims
+    }
+    access_token = jwt.encode(payload, secret_key, algorithm='HS256')
+    return access_token
+
 
 # REGISTER
 @app.route('/auth/register', methods=['POST'])
@@ -52,11 +66,14 @@ def register():
             'email': email
         })
 
+        # Generate access token
+        access_token = create_access_token_with_claims(email, secret_key)
+
         response = {
             'status': True,
             'message': 'Register success!',
             'data': {
-                'token': None
+                'token': access_token
             }
         }
 
