@@ -33,7 +33,7 @@ def create_access_token_with_claims(identity, secret_key):
     access_token = jwt.encode(payload, secret_key, algorithm='HS256')
     return access_token
 
-
+# ------------ AUTH --------------
 # REGISTER
 @app.route('/auth/register', methods=['POST'])
 def register():
@@ -42,6 +42,10 @@ def register():
     birthday = data.get('birthday')
     email = data.get('email')
     password = data.get('password')
+    height = data.get('height')
+    weight = data.get('weight')
+    gender = data.get('gender')
+    activity_level = data.get('activity_level')    
 
     # 400: Email invalid
     if not is_valid_email(email):
@@ -69,6 +73,17 @@ def register():
         # Generate access token
         access_token = create_access_token_with_claims(email, secret_key)
 
+        # Store body measurement data
+        body_measurement_ref = db.reference('body_measurements')
+        new_measurement_ref = body_measurement_ref.push()
+        new_measurement_ref.set({
+            'user_id': new_user_ref.key,
+            'height': height,
+            'weight': weight,
+            'gender': gender,
+            'activity_level': activity_level
+        })
+
         response = {
             'status': True,
             'message': 'Register success!',
@@ -88,7 +103,9 @@ def register():
         }
         return jsonify(response), 401
 
-# LOGIN
+
+
+
 
 
 if __name__ == '__main__':
