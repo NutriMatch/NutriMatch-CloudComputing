@@ -3,6 +3,9 @@ from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db, auth
 from config import secret_key
+from config import FIREBASE_AUTH_API
+from firebase_admin import auth, exceptions
+import requests
 import re
 import jwt
 
@@ -128,12 +131,22 @@ def login():
         }
         return jsonify(response), 400
 
-    # 200: Login success
-    try:
+    # 200: Success
+    # Authenticate with Firebase
+    payload = {
+        'email': email,
+        'password': password,
+        'returnSecureToken': True
+    }
+
+    response = requests.post(FIREBASE_AUTH_API, json=payload)
+    data = response.json()
+
+    if response.status_code == 200:
+        # Login successful
         user = auth.get_user_by_email(email)
         user_id = user.uid
 
-        # Generate access token
         access_token = create_access_token_with_claims(email, secret_key)
 
         # Get user data from Realtime Database
@@ -168,16 +181,16 @@ def login():
             }
         }
         return jsonify(response), 200
-    
-    # 401: Email or Password not found !! The response still error !!
-    except ValueError as e:
-        error_message = str(e)
+
+    else:
         response = {
             'status': False,
             'message': 'Email or password not found!',
             'data': None
         }
         return jsonify(response), 401
+
+
 
 
 
