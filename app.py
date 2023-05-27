@@ -105,7 +105,6 @@ def register():
         return jsonify(response), 401
 
 
-
 # LOGIN
 @app.route('/auth/login', methods=['POST'])
 def login():
@@ -191,13 +190,77 @@ def login():
         return jsonify(response), 401
 
 
+# ------------ USER PROFILE --------------
+# UPDATE BODY MEASUREMENTS
+@app.route('/profile/account_settings', methods=['PUT'])
+def account_settings():
+    # Get user ID from token (assuming the token is sent in the Authorization header)
+    auth_header = request.headers.get('Authorization')
+    if auth_header is None:
+        response = {
+            'status': False,
+            'message': 'Missing authorization token.',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    token = auth_header.split(' ')[1]  # Remove "Bearer " prefix
+    try:
+        decoded_token = jwt.decode(token, secret_key, algorithms=['HS256'])
+        user_id = decoded_token['sub']
+    except (jwt.DecodeError, jwt.ExpiredSignatureError):
+        response = {
+            'status': False,
+            'message': 'Invalid or expired token.',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    data = request.get_json()
+    weight = data.get('weight')
+    height = data.get('height')
+    gender = data.get('gender')
+    activity_level = data.get('activity_level')
+
+    #400: Validate the received data
+    if not all([weight, height, gender, activity_level]):
+        response = {
+            'status': False,
+            'message': 'Form are required!',
+            'data': None
+        }
+        return jsonify(response), 400
+
+    # Update body measurements in the database
+    body_measurement_ref = db.reference('body_measurements')
+    query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
+    if not query:
+        response = {
+            'status': False,
+            'message': 'Body measurements not found.',
+            'data': None
+        }
+        return jsonify(response), 404
+
+    measurement_id = list(query.keys())[0]
+    body_measurement_ref.child(measurement_id).update({
+        'weight': weight,
+        'height': height,
+        'gender': gender,
+        'activity_level': activity_level
+    })
+
+    response = {
+        'status': True,
+        'message': 'Settings bodys measurements success!',
+        'data': None
+    }
+    return jsonify(response), 200
 
 
-
-
-
-
-
+# Initialize Flask
+app.debug = True  # Aktifkan mode debug Flask
+CORS(app)
 
 if __name__ == '__main__':
     app.run()
