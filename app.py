@@ -146,7 +146,7 @@ def login():
 
         # User response data
         user_response = {
-            'id': 1,  # Provide the actual user ID here
+            'id': user_id,
             'fullname': user_data[list(user_data.keys())[0]]['fullname'],
             'email': email,
             'birthday': user_data[list(user_data.keys())[0]]['birthday'],
