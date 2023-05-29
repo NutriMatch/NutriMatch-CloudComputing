@@ -190,7 +190,64 @@ def login():
 
 # ------------ USER PROFILE --------------
 # ACCOUNT SETTING
+@app.route('/profile/account_settings', methods=['PUT'])
+def update_body_measurement():
+    # Get the token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if auth_header is None or not auth_header.startswith('Bearer '):
+        # Handle missing or invalid token
+        response = {
+            'status': False,
+            'message': 'Invalid token',
+            'data': None
+        }
+        return jsonify(response), 401
 
+    token = auth_header.split(' ')[1]
+
+    try:
+        # Decode the token to access the payload
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
+        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
+
+        # Retrieve the body measurement data from the request
+        height = request.form.get('height')
+        weight = request.form.get('weight')
+        gender = request.form.get('gender')
+        activity_level = request.form.get('activity_level')
+
+        # Check if all fields are provided
+        if not height or not weight or not gender or not activity_level:
+            response = {
+                'status': False,
+                'message': 'Form are required!',
+                'data': None
+            }
+            return jsonify(response), 400
+
+        response = {
+            'status': True,
+            'message': "Settings body's measurements success!",
+            'data': None
+        }
+        return jsonify(response), 200
+
+    except jwt.InvalidTokenError:
+        # Handle invalid token
+        response = {
+            'status': False,
+            'message': 'Invalid token',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    except Exception as e:
+        response = {
+            'status': False,
+            'message': 'Failed to update body measurements.',
+            'data': None
+        }
+        return jsonify(response), 500
 
 
 
