@@ -38,15 +38,14 @@ def create_access_token_with_claims(identity, secret_key):
 # REGISTER
 @app.route('/auth/register', methods=['POST'])
 def register():
-    data = request.get_json()
-    fullname = data.get('fullname') 
-    birthday = data.get('birthday')
-    email = data.get('email')
-    password = data.get('password')
-    height = data.get('height')
-    weight = data.get('weight')
-    gender = data.get('gender')
-    activity_level = data.get('activity_level')    
+    fullname = request.form['fullname']
+    birthday = request.form['birthday']
+    email = request.form['email']
+    password = request.form['password']
+    height = request.form['height']
+    weight = request.form['weight']
+    gender = request.form['gender']
+    activity_level = request.form['activity_level']  
 
     # 400: Email invalid
     if not is_valid_email(email):
@@ -108,9 +107,8 @@ def register():
 # LOGIN
 @app.route('/auth/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    email = request.form['email']
+    password = request.form['password']
 
     # 400: All fields required
     if not email or not password:
@@ -191,75 +189,15 @@ def login():
 
 
 # ------------ USER PROFILE --------------
-# UPDATE BODY MEASUREMENTS
-@app.route('/profile/account_settings', methods=['PUT'])
-def account_settings():
-    # Get user ID from token (assuming the token is sent in the Authorization header)
-    auth_header = request.headers.get('Authorization')
-    if auth_header is None:
-        response = {
-            'status': False,
-            'message': 'Missing authorization token.',
-            'data': None
-        }
-        return jsonify(response), 401
+# ACCOUNT SETTING
 
-    token = auth_header.split(' ')[1]  # Remove "Bearer " prefix
-    try:
-        decoded_token = jwt.decode(token, secret_key, algorithms=['HS256'])
-        user_id = decoded_token['sub']
-    except (jwt.DecodeError, jwt.ExpiredSignatureError):
-        response = {
-            'status': False,
-            'message': 'Invalid or expired token.',
-            'data': None
-        }
-        return jsonify(response), 401
 
-    data = request.get_json()
-    weight = data.get('weight')
-    height = data.get('height')
-    gender = data.get('gender')
-    activity_level = data.get('activity_level')
 
-    #400: Validate the received data
-    if not all([weight, height, gender, activity_level]):
-        response = {
-            'status': False,
-            'message': 'Form are required!',
-            'data': None
-        }
-        return jsonify(response), 400
 
-    # Update body measurements in the database
-    body_measurement_ref = db.reference('body_measurements')
-    query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
-    if not query:
-        response = {
-            'status': False,
-            'message': 'Body measurements not found.',
-            'data': None
-        }
-        return jsonify(response), 404
-
-    measurement_id = list(query.keys())[0]
-    body_measurement_ref.child(measurement_id).update({
-        'weight': weight,
-        'height': height,
-        'gender': gender,
-        'activity_level': activity_level
-    })
-
-    response = {
-        'status': True,
-        'message': 'Settings bodys measurements success!',
-        'data': None
-    }
-    return jsonify(response), 200
 
 
 # Initialize Flask
-app.debug = True  # Aktifkan mode debug Flask
+app.debug = False
 CORS(app)
 
 if __name__ == '__main__':
