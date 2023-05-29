@@ -194,8 +194,8 @@ def login():
 def update_body_measurement():
     # Get the token from the request headers
     auth_header = request.headers.get('Authorization')
+    
     if auth_header is None or not auth_header.startswith('Bearer '):
-        # Handle missing or invalid token
         response = {
             'status': False,
             'message': 'Invalid token',
@@ -216,7 +216,7 @@ def update_body_measurement():
         gender = request.form.get('gender')
         activity_level = request.form.get('activity_level')
 
-        # Check if all fields are provided
+        # 400: Form are required!
         if not height or not weight or not gender or not activity_level:
             response = {
                 'status': False,
@@ -225,6 +225,7 @@ def update_body_measurement():
             }
             return jsonify(response), 400
 
+        # 200: Success
         response = {
             'status': True,
             'message': "Settings body's measurements success!",
