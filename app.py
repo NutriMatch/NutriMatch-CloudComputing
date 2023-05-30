@@ -203,11 +203,8 @@ def get_user_id_from_token(token, secret_key):
 @app.route('/profile/account_settings', methods=['PUT'])
 def update_body_measurement():
     # Get the token from the request headers
-    headers = {
-    "Content-Type": "application/x-www-form-urlencoded"
-}
-    
     auth_header = request.headers.get('Authorization')
+    
     if auth_header is None or not auth_header.startswith('Bearer '):
         response = {
             'status': False,
@@ -215,30 +212,20 @@ def update_body_measurement():
             'data': None
         }
         return jsonify(response), 401
-    
+
     token = auth_header.split(' ')[1]
 
     try:
         # Decode the token to access the payload
-        # payload = jwt.decode(token, secret_key, algorithms=['HS256'])
-        # user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
-        
-        # Retrieve the body measurement data from the request
-        
-        height = int(request.form.get('height'))
-        weight = int(request.form.get('weight'))
-        gender = int(request.form.get('gender'))
-        activity_level = int(request.form.get('activity_level'))
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
+        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
 
-        user_id = get_user_id_from_token(token, secret_key)
-        if user_id is None:
-            response = {
-                'status': False,
-                'message': 'Invalid token',
-                'data': None
-                }
-            return jsonify(response), 401
-        
+        # Retrieve the body measurement data from the request
+        height = request.form.get('height')
+        weight = request.form.get('weight')
+        gender = request.form.get('gender')
+        activity_level = request.form.get('activity_level')
+
         # 400: Form are required!
         if not height or not weight or not gender or not activity_level:
             response = {
@@ -247,27 +234,27 @@ def update_body_measurement():
                 'data': None
             }
             return jsonify(response), 400
-        
-        # Update body measurement data in Firebase Realtime Database
+
+        # Update the body measurement data in the database
         body_measurement_ref = db.reference('body_measurements')
         query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
+        measurement_key = list(query.keys())[0]
 
-        for measurement_id in query:
-            measurement_ref = body_measurement_ref.child(measurement_id)
-            measurement_ref.update({
-                'height': height,
-                'weight': weight,
-                'gender': gender,
-                'activity_level': activity_level
+        body_measurement_ref.child(measurement_key).update({
+            'height': height,
+            'weight': weight,
+            'gender': gender,
+            'activity_level': activity_level
         })
 
-        # 200: Success
+        # Prepare the response
         response = {
             'status': True,
-            'message': 'Body measurements updated successfully.',
+            'message': "Settings body's measurements success!",
             'data': None
         }
         return jsonify(response), 200
+
 
     except jwt.InvalidTokenError:
         # Handle invalid token
@@ -285,7 +272,6 @@ def update_body_measurement():
             'data': None
         }
         return jsonify(response), 500
-
 
 
 
