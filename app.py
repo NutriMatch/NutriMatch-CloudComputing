@@ -4,7 +4,6 @@ import firebase_admin
 from firebase_admin import credentials, db, auth
 from config import secret_key
 from config import FIREBASE_AUTH_API
-from firebase_admin import auth, exceptions
 import requests
 import re
 import jwt
@@ -42,10 +41,10 @@ def register():
     birthday = request.form['birthday']
     email = request.form['email']
     password = request.form['password']
-    height = request.form['height']
-    weight = request.form['weight']
-    gender = request.form['gender']
-    activity_level = request.form['activity_level']  
+    height = int(request.form['height'])
+    weight = int(request.form['weight'])
+    gender = int(request.form['gender'])
+    activity_level = int(request.form['activity_level'])
 
     # 400: Email invalid
     if not is_valid_email(email):
@@ -188,13 +187,27 @@ def login():
         return jsonify(response), 401
 
 
+def get_user_id_from_token(token, secret_key):
+    try:
+        # Decode the token to access the payload
+        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
+        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
+        return user_id
+    
+    except jwt.InvalidTokenError:
+        # Handle invalid token
+        return None
+    
 # ------------ USER PROFILE --------------
 # ACCOUNT SETTING
 @app.route('/profile/account_settings', methods=['PUT'])
 def update_body_measurement():
     # Get the token from the request headers
-    auth_header = request.headers.get('Authorization')
+    headers = {
+    "Content-Type": "application/x-www-form-urlencoded"
+}
     
+    auth_header = request.headers.get('Authorization')
     if auth_header is None or not auth_header.startswith('Bearer '):
         response = {
             'status': False,
@@ -202,20 +215,30 @@ def update_body_measurement():
             'data': None
         }
         return jsonify(response), 401
-
+    
     token = auth_header.split(' ')[1]
 
     try:
         # Decode the token to access the payload
-        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
-        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
-
+        # payload = jwt.decode(token, secret_key, algorithms=['HS256'])
+        # user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
+        
         # Retrieve the body measurement data from the request
-        height = request.form.get('height')
-        weight = request.form.get('weight')
-        gender = request.form.get('gender')
-        activity_level = request.form.get('activity_level')
+        
+        height = int(request.form.get('height'))
+        weight = int(request.form.get('weight'))
+        gender = int(request.form.get('gender'))
+        activity_level = int(request.form.get('activity_level'))
 
+        user_id = get_user_id_from_token(token, secret_key)
+        if user_id is None:
+            response = {
+                'status': False,
+                'message': 'Invalid token',
+                'data': None
+                }
+            return jsonify(response), 401
+        
         # 400: Form are required!
         if not height or not weight or not gender or not activity_level:
             response = {
@@ -224,11 +247,24 @@ def update_body_measurement():
                 'data': None
             }
             return jsonify(response), 400
+        
+        # Update body measurement data in Firebase Realtime Database
+        body_measurement_ref = db.reference('body_measurements')
+        query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
+
+        for measurement_id in query:
+            measurement_ref = body_measurement_ref.child(measurement_id)
+            measurement_ref.update({
+                'height': height,
+                'weight': weight,
+                'gender': gender,
+                'activity_level': activity_level
+        })
 
         # 200: Success
         response = {
             'status': True,
-            'message': "Settings body's measurements success!",
+            'message': 'Body measurements updated successfully.',
             'data': None
         }
         return jsonify(response), 200
@@ -255,7 +291,8 @@ def update_body_measurement():
 
 
 # Initialize Flask
-app.debug = False
+app.debug = True
+print('Debugging message')
 CORS(app)
 
 if __name__ == '__main__':
