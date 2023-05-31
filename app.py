@@ -187,80 +187,68 @@ def login():
         return jsonify(response), 401
 
 
-def get_user_id_from_token(token, secret_key):
-    try:
-        # Decode the token to access the payload
-        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
-        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
-        return user_id
-    
-    except jwt.InvalidTokenError:
-        # Handle invalid token
-        return None
-    
 # ------------ USER PROFILE --------------
 # ACCOUNT SETTING
 @app.route('/profile/account_settings', methods=['PUT'])
-def update_body_measurement():
-    # Get the token from the request headers
+def update_account_settings():
+    # Get the user's access token from the request headers
     auth_header = request.headers.get('Authorization')
-    
-    if auth_header is None or not auth_header.startswith('Bearer '):
+    if not auth_header or not auth_header.startswith('Bearer '):
         response = {
             'status': False,
-            'message': 'Invalid token',
+            'message': 'Invalid access token!',
             'data': None
         }
         return jsonify(response), 401
 
-    token = auth_header.split(' ')[1]
+    access_token = auth_header.split(' ')[1]
 
     try:
-        # Decode the token to access the payload
-        payload = jwt.decode(token, secret_key, algorithms=['HS256'])
-        user_id = payload['sub']  # Assuming the user ID is stored in the 'sub' claim
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
 
-        # Retrieve the body measurement data from the request
-        height = request.form.get('height')
-        weight = request.form.get('weight')
-        gender = request.form.get('gender')
-        activity_level = request.form.get('activity_level')
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_data = users_ref.order_by_child('email').equal_to(user_email).get()
 
-        # 400: Form are required!
-        if not height or not weight or not gender or not activity_level:
-            response = {
-                'status': False,
-                'message': 'Form are required!',
-                'data': None
-            }
-            return jsonify(response), 400
-
-        # Update the body measurement data in the database
+        # Get body measurement data
         body_measurement_ref = db.reference('body_measurements')
-        query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
-        measurement_key = list(query.keys())[0]
+        query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
+        measurement_id = list(query.keys())[0]
 
-        body_measurement_ref.child(measurement_key).update({
+        # Update body measurement data
+        height = int(request.form['height'])
+        weight = int(request.form['weight'])
+        gender = request.form['gender']
+        activity_level = request.form['activity_level']
+
+        body_measurement_ref.child(measurement_id).update({
             'height': height,
             'weight': weight,
             'gender': gender,
             'activity_level': activity_level
         })
 
-        # Prepare the response
         response = {
             'status': True,
-            'message': "Settings body's measurements success!",
+            'message': 'Account settings updated successfully!',
             'data': None
         }
         return jsonify(response), 200
 
-
-    except jwt.InvalidTokenError:
-        # Handle invalid token
+    except jwt.ExpiredSignatureError:
         response = {
             'status': False,
-            'message': 'Invalid token',
+            'message': 'Expired access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    except jwt.InvalidTokenError:
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
             'data': None
         }
         return jsonify(response), 401
@@ -268,11 +256,10 @@ def update_body_measurement():
     except Exception as e:
         response = {
             'status': False,
-            'message': 'Failed to update body measurements.',
+            'message': 'An error occurred while updating account settings.',
             'data': None
         }
         return jsonify(response), 500
-
 
 
 
