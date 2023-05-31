@@ -43,8 +43,8 @@ def register():
     password = request.form['password']
     height = int(request.form['height'])
     weight = int(request.form['weight'])
-    gender = int(request.form['gender'])
-    activity_level = int(request.form['activity_level'])
+    gender = request.form['gender']
+    activity_level = request.form['activity_level']
 
     # 400: Email invalid
     if not is_valid_email(email):
