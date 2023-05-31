@@ -296,6 +296,141 @@ def update_account_settings():
         }
         return jsonify(response), 500
 
+@app.route('/profile', methods=['GET'])
+def get_profile():
+    # Get the user's access token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'response': {
+                'status': False,
+                'message': 'Invalid token, please re-login',
+                'data': None
+            }
+        }
+        return jsonify(response), 401
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_data = users_ref.order_by_child('email').equal_to(user_email).get()
+
+        user_id = list(user_data.keys())[0]
+
+        # Get body measurement data
+        body_measurement_ref = db.reference('body_measurements')
+        query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
+        measurement_id = list(query.keys())[0]
+
+        # User response data
+        user_response = {
+            'id': user_id,
+            'fullname': user_data[user_id]['fullname'],
+            'email': user_email,
+            'birthday': user_data[user_id]['birthday'],
+            'body_measurement': {
+                'height': query[measurement_id]['height'],
+                'weight': query[measurement_id]['weight'],
+                'activity_level': query[measurement_id]['activity_level'],
+                'gender': query[measurement_id]['gender']
+            }
+        }
+
+        response = {
+            'status': True,
+            'message': 'Success get profile data',
+            'data': user_response
+        }
+        return jsonify(response), 200
+
+    except Exception as e:
+        response = {
+            'status': False,
+            'message': 'An error occurred while retrieving the user profile.',
+            'data': None
+        }
+        return jsonify(response), 500
+
+
+@app.route('/profile/account', methods=['PUT'])
+def update_account():
+        # Get the user's access token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Invalid token!, please re-login',
+                    'data': None
+                }
+            }
+        }
+        return jsonify(response), 401
+    
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_data = users_ref.order_by_child('email').equal_to(user_email).get()
+        user_id = list(user_data.keys())[0]
+
+        if not user_data:
+                response = {
+                    'status': False,
+                    'message': 'User not found!',
+                    'data': None
+                }
+                return jsonify(response), 404
+
+        # Update user's fullname and birthday
+        fullname = request.form.get('fullname')
+        birthday = request.form.get('birthday')
+
+        # Check if fullname and birthday are provided
+        if not fullname or not birthday:
+            response = {
+                'status': False,
+                'message': 'Fullname and birthday are required fields!',
+                'data': None
+            }
+            return jsonify(response), 400
+
+        # Update user data in Realtime Database
+        users_ref.child(user_id).update({
+            'fullname': fullname,
+            'birthday': birthday
+        })
+
+        response = {
+            'status': True,
+            'message': 'Edit success!',
+            'data': None
+        }
+        return jsonify(response), 201
+    
+    except auth.AuthError as e:
+        # Check if the error is due to insufficient permissions
+        if e.code == 'insufficient-permission':
+            response = {
+                'status': False,
+                'message': 'Forbidden',
+                'data': None
+            }
+            return jsonify(response), 403
+        
 
 # Initialize Flask
 app.debug = True
