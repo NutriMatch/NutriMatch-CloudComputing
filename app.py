@@ -208,6 +208,7 @@ def login():
 
 
 # ------------ USER PROFILE --------------
+# ACCOUNT SETTINGS
 @app.route('/profile/account_settings', methods=['PUT'])
 def update_account_settings():
     # Get the user's access token from the request headers
@@ -225,7 +226,6 @@ def update_account_settings():
         return jsonify(response), 401
 
     access_token = auth_header.split(' ')[1]
-
     try:
         # Verify the access token
         payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
@@ -240,13 +240,13 @@ def update_account_settings():
         query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
         measurement_id = list(query.keys())[0]
 
-        # Update body measurement data
+        # Request
         height = request.form.get('height')
         weight = request.form.get('weight')
         gender = request.form.get('gender')
         activity_level = request.form.get('activity_level')
 
-        # Check if all fields are filled
+        # 400: Form are required
         if not height or not weight or not gender or not activity_level:
             response = {
                 'status': False,
@@ -264,7 +264,6 @@ def update_account_settings():
             'gender': gender,
             'activity_level': activity_level
         })
-
         response = {
             'status': True,
             'message': 'Settings body\'s measurements success!',
@@ -296,16 +295,20 @@ def update_account_settings():
         }
         return jsonify(response), 500
 
+
+# PROFILE
 @app.route('/profile', methods=['GET'])
 def get_profile():
-    # Get the user's access token from the request headers
     auth_header = request.headers.get('Authorization')
+    # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
             'response': {
-                'status': False,
-                'message': 'Invalid token, please re-login',
-                'data': None
+                'value': {
+                    'status': False,
+                    'message': 'Invalid token, please re-login',
+                    'data': None
+                }
             }
         }
         return jsonify(response), 401
@@ -328,7 +331,7 @@ def get_profile():
         query = body_measurement_ref.order_by_child('user_id').equal_to(user_id).get()
         measurement_id = list(query.keys())[0]
 
-        # User response data
+        # 200: Success
         user_response = {
             'id': user_id,
             'fullname': user_data[user_id]['fullname'],
@@ -341,7 +344,6 @@ def get_profile():
                 'gender': query[measurement_id]['gender']
             }
         }
-
         response = {
             'status': True,
             'message': 'Success get profile data',
@@ -357,11 +359,11 @@ def get_profile():
         }
         return jsonify(response), 500
 
-
+# ACCOUNT
 @app.route('/profile/account', methods=['PUT'])
 def update_account():
-        # Get the user's access token from the request headers
     auth_header = request.headers.get('Authorization')
+    # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
             'response': {
@@ -373,7 +375,6 @@ def update_account():
             }
         }
         return jsonify(response), 401
-    
 
     access_token = auth_header.split(' ')[1]
 
@@ -387,19 +388,24 @@ def update_account():
         user_data = users_ref.order_by_child('email').equal_to(user_email).get()
         user_id = list(user_data.keys())[0]
 
+        # 404: User not found
         if not user_data:
-                response = {
-                    'status': False,
-                    'message': 'User not found!',
-                    'data': None
+            response = {
+                'response': {
+                    'value': {
+                        'status': False,
+                        'message': 'User not found!',
+                        'data': None
+                    }
                 }
-                return jsonify(response), 404
+            }
+            return jsonify(response), 404
 
         # Update user's fullname and birthday
         fullname = request.form.get('fullname')
         birthday = request.form.get('birthday')
 
-        # Check if fullname and birthday are provided
+        # 400: Fullname and birthday are required
         if not fullname or not birthday:
             response = {
                 'status': False,
@@ -408,12 +414,12 @@ def update_account():
             }
             return jsonify(response), 400
 
+        # 201: Success
         # Update user data in Realtime Database
         users_ref.child(user_id).update({
             'fullname': fullname,
             'birthday': birthday
         })
-
         response = {
             'status': True,
             'message': 'Edit success!',
@@ -422,7 +428,7 @@ def update_account():
         return jsonify(response), 201
     
     except auth.AuthError as e:
-        # Check if the error is due to insufficient permissions
+        # 403: Forbidden
         if e.code == 'insufficient-permission':
             response = {
                 'status': False,
