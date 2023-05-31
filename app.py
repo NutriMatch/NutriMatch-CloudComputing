@@ -49,9 +49,13 @@ def register():
     # 400: Email invalid
     if not is_valid_email(email):
         response = {
-            'status': False,
-            'message': 'Email invalid!',
-            'data': None
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Email invalid!',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 400
 
@@ -96,9 +100,13 @@ def register():
     # 401: Email already registered
     except auth.EmailAlreadyExistsError:
         response = {
-            'status': False,
-            'message': 'Email already registered!',
-            'data': None
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Email already registered!',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 401
 
@@ -112,18 +120,26 @@ def login():
     # 400: All fields required
     if not email or not password:
         response = {
-            'status': False,
-            'message': 'Email and password are required fields.',
-            'data': None
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Email and password are required fields.',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 400
 
     # 400: Invalid email
     if not is_valid_email(email):
         response = {
-            'status': False,
-            'message': 'Email Invalid!',
-            'data': None
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Email Invalid!',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 400
 
@@ -180,24 +196,31 @@ def login():
 
     else:
         response = {
-            'status': False,
-            'message': 'Email or password not found!',
-            'data': None
+            'response':{
+                'value': {
+                    'status': False,
+                    'message': 'Email or password not found!',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 401
 
 
 # ------------ USER PROFILE --------------
-# ACCOUNT SETTING
 @app.route('/profile/account_settings', methods=['PUT'])
 def update_account_settings():
     # Get the user's access token from the request headers
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
-            'status': False,
-            'message': 'Invalid access token!',
-            'data': None
+            'response': {
+                'value': {
+                    'status': False,
+                    'message': 'Invalid access token!',
+                    'data': None
+                }
+            }
         }
         return jsonify(response), 401
 
@@ -218,10 +241,22 @@ def update_account_settings():
         measurement_id = list(query.keys())[0]
 
         # Update body measurement data
-        height = int(request.form['height'])
-        weight = int(request.form['weight'])
-        gender = request.form['gender']
-        activity_level = request.form['activity_level']
+        height = request.form.get('height')
+        weight = request.form.get('weight')
+        gender = request.form.get('gender')
+        activity_level = request.form.get('activity_level')
+
+        # Check if all fields are filled
+        if not height or not weight or not gender or not activity_level:
+            response = {
+                'status': False,
+                'message': 'Form are required!',
+                'data': None
+            }
+            return jsonify(response), 400
+
+        height = int(height)
+        weight = int(weight)
 
         body_measurement_ref.child(measurement_id).update({
             'height': height,
@@ -232,7 +267,7 @@ def update_account_settings():
 
         response = {
             'status': True,
-            'message': 'Account settings updated successfully!',
+            'message': 'Settings body\'s measurements success!',
             'data': None
         }
         return jsonify(response), 200
@@ -260,7 +295,6 @@ def update_account_settings():
             'data': None
         }
         return jsonify(response), 500
-
 
 
 # Initialize Flask
