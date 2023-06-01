@@ -54,11 +54,11 @@ def calculate_calories_needed(weight, height, age, gender, activity_level):
         return None
     
     if activity_level == 'L':
-        calories_needed = bmr * 1.2 * 7
+        calories_needed = bmr * 1.2 
     elif activity_level == 'M':
-        calories_needed = bmr * 1.55 * 7
+        calories_needed = bmr * 1.55 
     elif activity_level == 'H':
-        calories_needed = bmr * 1.9 * 7
+        calories_needed = bmr * 1.9 
     else:
         return None
 

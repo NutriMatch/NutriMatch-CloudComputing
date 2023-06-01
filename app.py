@@ -35,13 +35,9 @@ def register():
     # 400: Email invalid
     if not is_valid_email(email):
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Email invalid!',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Email invalid!',
+            'data': None
         }
         return jsonify(response), 400
 
@@ -86,13 +82,9 @@ def register():
     # 401: Email already registered
     except auth.EmailAlreadyExistsError:
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Email already registered!',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Email already registered!',
+            'data': None
         }
         return jsonify(response), 401
 
@@ -106,26 +98,18 @@ def login():
     # 400: All fields required
     if not email or not password:
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Email and password are required fields.',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Email and password are required fields.',
+            'data': None
         }
         return jsonify(response), 400
 
     # 400: Invalid email
     if not is_valid_email(email):
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Email Invalid!',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Email Invalid!',
+            'data': None
         }
         return jsonify(response), 400
 
@@ -180,14 +164,11 @@ def login():
 
     else:
         response = {
-            'response':{
-                'value': {
-                    'status': False,
-                    'message': 'Email or password not found!',
-                    'data': None
-                }
-            }
+        'status': False,
+        'message': 'Email or password not found!',
+        'data': None
         }
+
         return jsonify(response), 401
 
 
@@ -199,13 +180,9 @@ def update_account_settings():
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Invalid access token!',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
         }
         return jsonify(response), 401
 
@@ -286,13 +263,9 @@ def get_profile():
     # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Invalid token, please re-login',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Invalid token, please re-login',
+            'data': None
         }
         return jsonify(response), 401
 
@@ -349,14 +322,11 @@ def update_account():
     # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
-            'response': {
-                'value': {
-                    'status': False,
-                    'message': 'Invalid token!, please re-login',
-                    'data': None
-                }
-            }
+            'status': False,
+            'message': 'Invalid token!, please re-login',
+            'data': None
         }
+ 
         return jsonify(response), 401
 
     access_token = auth_header.split(' ')[1]
@@ -374,13 +344,9 @@ def update_account():
         # 404: User not found
         if not user_data:
             response = {
-                'response': {
-                    'value': {
-                        'status': False,
-                        'message': 'User not found!',
-                        'data': None
-                    }
-                }
+                'status': False,
+                'message': 'User not found!',
+                'data': None
             }
             return jsonify(response), 404
 
@@ -545,7 +511,6 @@ def get_calories_needed():
             'data': str(e)
         }
         return jsonify(response), 500
-
 
 # Initialize Flask
 app.debug = True
