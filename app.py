@@ -164,9 +164,9 @@ def login():
 
     else:
         response = {
-        'status': False,
-        'message': 'Email or password not found!',
-        'data': None
+            'status': False,
+            'message': 'Email or password not found!',
+            'data': None
         }
 
         return jsonify(response), 401
@@ -354,7 +354,6 @@ def update_account():
         fullname = request.form.get('fullname')
         birthday = request.form.get('birthday')
 
-        # 400: Fullname and birthday are required
         if not fullname or not birthday:
             response = {
                 'status': False,
@@ -393,11 +392,11 @@ def update_account():
 def get_calories_needed():
     auth_header = request.headers.get('Authorization')
 
-    # Check if the access token is provided
+    # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
             'status': False,
-            'message': 'Invalid access token!',
+            'message': 'Invalid token!, please re-login',
             'data': None
         }
         return jsonify(response), 401
@@ -487,7 +486,7 @@ def get_calories_needed():
 
         response = {
             'status': True,
-            'message': 'Calories needed calculated successfully.',
+            'message': 'Success get dashboard',
             'data': {
                 'user': user_response,
             },
@@ -495,14 +494,6 @@ def get_calories_needed():
             'history_food': history_food
         }
         return jsonify(response), 200
-
-    except jwt.exceptions.InvalidTokenError:
-        response = {
-            'status': False,
-            'message': 'Invalid token, please re-login',
-            'data': None
-        }
-        return jsonify(response), 401
 
     except Exception as e:
         response = {
