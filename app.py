@@ -5,8 +5,8 @@ from firebase_admin import credentials, db, auth
 from config import secret_key
 from config import FIREBASE_AUTH_API
 from datetime import datetime
+from utils import is_valid_email, create_access_token_with_claims, calculate_age, calculate_calories_needed
 import requests
-import re
 import jwt
 
 # Initialize Firebase
@@ -18,21 +18,6 @@ firebase_admin.initialize_app(cred, {
 # Initialize Flask
 app = Flask(__name__)
 CORS(app)
-
-def is_valid_email(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email) is not None
-
-def create_access_token_with_claims(identity, secret_key):
-    additional_claims = {
-        'custom_key': 'hctamirtun'
-    }
-    payload = {
-        'sub': identity,
-        **additional_claims
-    }
-    access_token = jwt.encode(payload, secret_key, algorithm='HS256')
-    return access_token
 
 # ------------ AUTH --------------
 # REGISTER
@@ -156,10 +141,8 @@ def login():
     data = response.json()
 
     if response.status_code == 200:
-        # Login successful
         user = auth.get_user_by_email(email)
         user_id = user.uid
-
         access_token = create_access_token_with_claims(email, secret_key)
 
         # Get user data from Realtime Database
@@ -295,7 +278,6 @@ def update_account_settings():
             'data': None
         }
         return jsonify(response), 500
-
 
 # PROFILE
 @app.route('/profile', methods=['GET'])
@@ -439,55 +421,8 @@ def update_account():
             return jsonify(response), 403
         
 
-def calculate_age(birthday):
-    birth_date = datetime.strptime(birthday, '%Y-%m-%d').date()
-    today = datetime.today().date()
-    age = today.year - birth_date.year
-    if today.month < birth_date.month or (today.month == birth_date.month and today.day < birth_date.day):
-        age -= 1
-    return age
-
-# Calculate Calories Needed
-def calculate_calories_needed(weight, height, age, gender, activity_level):
-    # Constants for calculating calories
-    MALE_BMR_CONSTANT = 66
-    FEMALE_BMR_CONSTANT = 655
-    MALE_WEIGHT_FACTOR = 13.75
-    FEMALE_WEIGHT_FACTOR = 9.56
-    MALE_HEIGHT_FACTOR = 5
-    FEMALE_HEIGHT_FACTOR = 1.8
-    MALE_AGE_FACTOR = 6.75
-    FEMALE_AGE_FACTOR = 4.7
-
-    if gender == 'M':
-        bmr = (
-            MALE_BMR_CONSTANT
-            + (MALE_WEIGHT_FACTOR * weight)
-            + (MALE_HEIGHT_FACTOR * height)
-            - (MALE_AGE_FACTOR * age)
-        )
-    elif gender == 'F':
-        bmr = (
-            FEMALE_BMR_CONSTANT
-            + (FEMALE_WEIGHT_FACTOR * weight)
-            + (FEMALE_HEIGHT_FACTOR * height)
-            - (FEMALE_AGE_FACTOR * age)
-        )
-    else:
-        return None
-    
-    if activity_level == 'L':
-        calories_needed = bmr * 1.2
-    elif activity_level == 'M':
-        calories_needed = bmr * 1.55
-    elif activity_level == 'H':
-        calories_needed = bmr * 1.9
-    else:
-        return None
-
-    return calories_needed
-
-# New route for calculating calories needed
+# ------------ MASTER --------------
+# DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
 def get_calories_needed():
     auth_header = request.headers.get('Authorization')
