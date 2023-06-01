@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, db, auth
 from config import secret_key
 from config import FIREBASE_AUTH_API
+from datetime import datetime
 import requests
 import re
 import jwt
@@ -437,6 +438,179 @@ def update_account():
             }
             return jsonify(response), 403
         
+
+def calculate_age(birthday):
+    birth_date = datetime.strptime(birthday, '%Y-%m-%d').date()
+    today = datetime.today().date()
+    age = today.year - birth_date.year
+    if today.month < birth_date.month or (today.month == birth_date.month and today.day < birth_date.day):
+        age -= 1
+    return age
+
+# Calculate Calories Needed
+def calculate_calories_needed(weight, height, age, gender, activity_level):
+    # Constants for calculating calories
+    MALE_BMR_CONSTANT = 66
+    FEMALE_BMR_CONSTANT = 655
+    MALE_WEIGHT_FACTOR = 13.75
+    FEMALE_WEIGHT_FACTOR = 9.56
+    MALE_HEIGHT_FACTOR = 5
+    FEMALE_HEIGHT_FACTOR = 1.8
+    MALE_AGE_FACTOR = 6.75
+    FEMALE_AGE_FACTOR = 4.7
+
+    if gender == 'M':
+        bmr = (
+            MALE_BMR_CONSTANT
+            + (MALE_WEIGHT_FACTOR * weight)
+            + (MALE_HEIGHT_FACTOR * height)
+            - (MALE_AGE_FACTOR * age)
+        )
+    elif gender == 'F':
+        bmr = (
+            FEMALE_BMR_CONSTANT
+            + (FEMALE_WEIGHT_FACTOR * weight)
+            + (FEMALE_HEIGHT_FACTOR * height)
+            - (FEMALE_AGE_FACTOR * age)
+        )
+    else:
+        return None
+    
+    if activity_level == 'L':
+        calories_needed = bmr * 1.2
+    elif activity_level == 'M':
+        calories_needed = bmr * 1.55
+    elif activity_level == 'H':
+        calories_needed = bmr * 1.9
+    else:
+        return None
+
+    return calories_needed
+
+# New route for calculating calories needed
+@app.route('/master/dashboard', methods=['GET'])
+def get_calories_needed():
+    auth_header = request.headers.get('Authorization')
+
+    # Check if the access token is provided
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_data = users_ref.order_by_child('email').equal_to(user_email).get()
+
+        # Get body measurement data
+        body_measurement_ref = db.reference('body_measurements')
+        query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
+        measurement_id = list(query.keys())[0]
+
+        # Extract necessary data for calorie calculation
+        weight = query[measurement_id]['weight']
+        height = query[measurement_id]['height']
+        gender = query[measurement_id]['gender']
+        activity_level = query[measurement_id]['activity_level']
+
+        # Modify the code to retrieve user_id
+        user_id = list(user_data.keys())[0]
+        
+        # Calculate calories needed
+        age = calculate_age(user_data[list(user_data.keys())[0]]['birthday'])
+        calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
+
+        # Hitung kebutuhan protein (10-35% total kalori)
+        protein = calories_needed * 0.15 / 4
+
+        # Hitung kebutuhan lemak (20-35% total kalori)
+        fat = calories_needed * 0.25 / 9
+
+        # Hitung kebutuhan karbohidrat (45-65% total kalori)
+        carbohydrate = calories_needed * 0.55 / 4
+
+        # 200: Success
+        user_response = {
+            'id': user_id,
+            'fullname': user_data[user_id]['fullname'],
+            'email': user_email,
+            'birthday': user_data[user_id]['birthday'],
+            'body_measurement': {
+                'height': query[measurement_id]['height'],
+                'weight': query[measurement_id]['weight'],
+                'activity_level': query[measurement_id]['activity_level'],
+                'gender': query[measurement_id]['gender']
+            }
+        }
+
+        graph = {
+            'calories':{
+                'target': calories_needed,
+                'current': None
+            },
+            'protein': {
+                'target': protein,
+                'current': None
+            },
+            'fat': {
+                'target': fat,
+                'current': None
+            },
+            'carbs': {
+                'target': carbohydrate,
+                'current': None
+            }
+        }
+
+        history_food = {
+            'breakfast':[{
+                'get_makanan_user': None #get makanan user 
+            }],
+            'lunch':[{
+                'get_makanan_user': None #get makanan user 
+            }],
+            'dinner':[{
+                'get_makanan_user': None #get makanan user 
+            }]
+        }
+
+        response = {
+            'status': True,
+            'message': 'Calories needed calculated successfully.',
+            'data': {
+                'user': user_response,
+            },
+            'graph': graph,
+            'history_food': history_food
+        }
+        return jsonify(response), 200
+
+    except jwt.exceptions.InvalidTokenError:
+        response = {
+            'status': False,
+            'message': 'Invalid token, please re-login',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    except Exception as e:
+        response = {
+            'status': False,
+            'message': 'Failed to calculate calories needed.',
+            'data': str(e)
+        }
+        return jsonify(response), 500
+
 
 # Initialize Flask
 app.debug = True
