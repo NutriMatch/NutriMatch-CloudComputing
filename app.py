@@ -41,7 +41,7 @@ def register():
         }
         return jsonify(response), 400
 
-    # 200: Registration
+    # 201: Registration
     try:
         # Create authentication 
         user = auth.create_user(email=email, password=password)
@@ -77,7 +77,7 @@ def register():
             }
         }
 
-        return jsonify(response), 200
+        return jsonify(response), 201
     
     # 401: Email already registered
     except auth.EmailAlreadyExistsError:
@@ -119,7 +119,7 @@ def check_email():
             'message': 'Email can be registered!',
             'data': None
         }
-        return jsonify(response), 200
+        return jsonify(response), 201
 
 # LOGIN
 @app.route('/auth/login', methods=['POST'])
@@ -303,8 +303,8 @@ def get_profile():
 
     access_token = auth_header.split(' ')[1]
 
+    # Verify the access token
     try:
-        # Verify the access token
         payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
         user_email = payload['sub']
 
@@ -339,13 +339,13 @@ def get_profile():
         }
         return jsonify(response), 200
 
-    except Exception as e:
+    except jwt.exceptions.InvalidTokenError:
         response = {
             'status': False,
-            'message': 'An error occurred while retrieving the user profile.',
+            'message': 'Invalid token, please re-login',
             'data': None
         }
-        return jsonify(response), 500
+        return jsonify(response), 401
 
 # ACCOUNT
 @app.route('/profile/account', methods=['PUT'])
@@ -371,7 +371,6 @@ def update_account():
         # Get user data from Realtime Database
         users_ref = db.reference('users')
         user_data = users_ref.order_by_child('email').equal_to(user_email).get()
-        user_id = list(user_data.keys())[0]
 
         # 404: User not found
         if not user_data:
@@ -381,6 +380,8 @@ def update_account():
                 'data': None
             }
             return jsonify(response), 404
+
+        user_id = list(user_data.keys())[0]
 
         # Update user's fullname and birthday
         fullname = request.form.get('fullname')
@@ -393,6 +394,15 @@ def update_account():
                 'data': None
             }
             return jsonify(response), 400
+
+        # 403: Forbidden
+        if user_email != user_data[user_id]['email']:
+            response = {
+                'status': False,
+                'message': 'Forbidden',
+                'data': None
+            }
+            return jsonify(response), 403
 
         # 201: Success
         # Update user data in Realtime Database
@@ -407,16 +417,91 @@ def update_account():
         }
         return jsonify(response), 201
     
-    except auth.AuthError as e:
-        # 403: Forbidden
-        if e.code == 'insufficient-permission':
+    # 401: Invalid Token
+    except jwt.exceptions.InvalidTokenError:
+        response = {
+            'status': False,
+            'message': 'Invalid token, please re-login',
+            'data': None
+        }
+        return jsonify(response), 401
+
+# PASSWORD
+@app.route('/profile/password', methods=['PUT'])
+def change_password():
+    auth_header = request.headers.get('Authorization')
+
+    # 401: Invalid token
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'status': False,
+            'message': 'Invalid token! Please re-login',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        old_password = request.form['old_password']
+        new_password = request.form['new_password']
+
+        if not new_password:
             response = {
                 'status': False,
-                'message': 'Forbidden',
+                'message': 'New password is required!',
                 'data': None
             }
-            return jsonify(response), 403
-        
+            return jsonify(response), 400
+
+        user = auth.get_user_by_email(user_email)
+
+        if old_password == new_password:
+            response = {
+                'status': False,
+                'message': 'New password must be different from the old password!',
+                'data': None
+            }
+            return jsonify(response), 400
+
+        # Change password
+        auth.update_user(user.uid, password=new_password)
+
+        response = {
+            'status': True,
+            'message': 'Edit success!',
+            'data': None
+        }
+        return jsonify(response), 200
+
+    except jwt.InvalidTokenError:
+        response = {
+            'status': False,
+            'message': 'Invalid token! Please re-login',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    except firebase_admin.auth.UserNotFoundError:
+        response = {
+            'status': False,
+            'message': 'User not found!',
+            'data': None
+        }
+        return jsonify(response), 404
+    
+    except Exception as e:
+        response = {
+            'status': False,
+            'message': str(e),
+            'data': None
+        }
+        return jsonify(response), 500
+
 
 # ------------ MASTER --------------
 # DASHBOARD
@@ -459,8 +544,17 @@ def get_calories_needed():
         user_id = list(user_data.keys())[0]
         
         # Calculate calories needed
-        age = calculate_age(user_data[list(user_data.keys())[0]]['birthday'])
+        age = calculate_age(user_data[user_id]['birthday'])
         calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
+
+        # Check if calorie calculation failed
+        if calories_needed is None:
+            response = {
+                'status': False,
+                'message': 'Failed to calculate calories needed',
+                'data': None
+            }
+            return jsonify(response), 500
 
         # Hitung kebutuhan protein (10-35% total kalori)
         protein = calories_needed * 0.15 / 4
@@ -527,13 +621,14 @@ def get_calories_needed():
         }
         return jsonify(response), 200
 
-    except Exception as e:
+    except jwt.exceptions.InvalidTokenError:
         response = {
             'status': False,
-            'message': 'Failed to calculate calories needed.',
-            'data': str(e)
+            'message': 'Invalid token, please re-login',
+            'data': None
         }
-        return jsonify(response), 500
+        return jsonify(response), 401
+
 
 # SCAN NUTRITION
 
