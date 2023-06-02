@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
-from firebase_admin import credentials, db, auth
+from firebase_admin import credentials, db, auth, storage
 from config import secret_key
 from config import FIREBASE_AUTH_API
 from datetime import datetime
@@ -88,6 +88,38 @@ def register():
         }
         return jsonify(response), 401
 
+# CHECK EMAIL
+@app.route('/auth/check_email', methods=['POST'])
+def check_email():
+    email = request.form['email']
+
+    # 400: Email Invalid
+    if not is_valid_email(email):
+        response = {
+            'status': False,
+            'message': 'Email invalid!',
+            'data': None
+        }
+        return jsonify(response), 400
+
+    # 409 : Email already registered
+    try:
+        user = auth.get_user_by_email(email)
+        response = {
+            'status': False,
+            'message': 'Email already registered!',
+            'data': None
+        }
+        return jsonify(response), 409
+
+    # 200: Email can be registered!
+    except auth.UserNotFoundError:
+        response = {
+            'status': True,
+            'message': 'Email can be registered!',
+            'data': None
+        }
+        return jsonify(response), 200
 
 # LOGIN
 @app.route('/auth/login', methods=['POST'])
@@ -137,7 +169,6 @@ def login():
         body_measurement_ref = db.reference('body_measurements')
         query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
 
-        # User response data
         user_response = {
             'id': user_id,
             'fullname': user_data[list(user_data.keys())[0]]['fullname'],
@@ -187,6 +218,7 @@ def update_account_settings():
         return jsonify(response), 401
 
     access_token = auth_header.split(' ')[1]
+
     try:
         # Verify the access token
         payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
@@ -502,6 +534,9 @@ def get_calories_needed():
             'data': str(e)
         }
         return jsonify(response), 500
+
+# SCAN NUTRITION
+
 
 # Initialize Flask
 app.debug = True
