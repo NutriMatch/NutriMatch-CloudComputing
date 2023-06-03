@@ -1,6 +1,7 @@
 import re
 import jwt
 from datetime import datetime
+from firebase_admin import db
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -63,3 +64,12 @@ def calculate_calories_needed(weight, height, age, gender, activity_level):
         return None
 
     return calories_needed
+
+def get_nutrition_info(label):
+    ref = db.reference('food_nutrients/' + label)
+    nutrition_info = ref.get()
+    return nutrition_info
+
+def get_class_labels(class_indices):
+    class_labels = ["ayam", "nasi", "telur", "brokoli", "ikan", "jeruk", "mie", "roti", "tahu", "tempe"]
+    return [class_labels[idx] for idx in class_indices]

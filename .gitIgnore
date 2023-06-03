@@ -3,3 +3,4 @@ config.py
 __pycache__/
 *.pyc
 serviceAccountKey1.json
+model.h5

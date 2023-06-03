@@ -5,7 +5,12 @@ from firebase_admin import credentials, db, auth, storage
 from config import secret_key
 from config import FIREBASE_AUTH_API
 from datetime import datetime
-from utils import is_valid_email, create_access_token_with_claims, calculate_age, calculate_calories_needed
+from utils import *
+import numpy as np
+from tensorflow.keras.utils import load_img, img_to_array
+from tensorflow.keras.models import load_model
+from PIL import Image
+import io
 import requests
 import jwt
 
@@ -534,20 +539,19 @@ def get_calories_needed():
         query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
         measurement_id = list(query.keys())[0]
 
-        # Extract necessary data for calorie calculation
+        # Data need for calculation
         weight = query[measurement_id]['weight']
         height = query[measurement_id]['height']
         gender = query[measurement_id]['gender']
         activity_level = query[measurement_id]['activity_level']
 
-        # Modify the code to retrieve user_id
+        # Retrieve user_id
         user_id = list(user_data.keys())[0]
         
         # Calculate calories needed
         age = calculate_age(user_data[user_id]['birthday'])
         calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
 
-        # Check if calorie calculation failed
         if calories_needed is None:
             response = {
                 'status': False,
@@ -556,13 +560,13 @@ def get_calories_needed():
             }
             return jsonify(response), 500
 
-        # Hitung kebutuhan protein (10-35% total kalori)
+        # Protein calculation (10-35% total kalori)
         protein = calories_needed * 0.15 / 4
 
-        # Hitung kebutuhan lemak (20-35% total kalori)
+        # Fat calculation (20-35% total kalori)
         fat = calories_needed * 0.25 / 9
 
-        # Hitung kebutuhan karbohidrat (45-65% total kalori)
+        # Carbs calculation (45-65% total kalori)
         carbohydrate = calories_needed * 0.55 / 4
 
         # 200: Success
@@ -630,7 +634,71 @@ def get_calories_needed():
         return jsonify(response), 401
 
 
+model = load_model('model.h5')
+
 # SCAN NUTRITION
+@app.route('/master/scan_nutrition', methods=['POST'])
+def scan_nutrition():
+    food_image = request.files['food_image']
+    food_title = request.form['food_title']
+    food_weight = float(request.form['food_weight'])
+
+    # Load Image
+    img = load_img(io.BytesIO(food_image.read()), target_size=(150, 150))
+    x = img_to_array(img)
+    x /= 255
+    x = np.expand_dims(x, axis=0)
+    images = np.vstack([x])
+
+    # ML detection
+    classes = model.predict(images, batch_size=1)
+
+    # Detection Confidence
+    threshold = 0.9999 
+    class_indices = np.where(classes[0] > threshold)[0]
+
+    # Get Detected Label
+    class_labels = get_class_labels(class_indices)
+
+    # 401: Failed to scan
+    if len(class_labels) == 0:
+        # 401: Failed to scan
+        response = {
+            'status': False,
+            'message': 'Failed to scan food',
+            'data': []
+        }
+        return jsonify(response), 401
+
+    # Calculate nutrition for each label
+    nutrition_info = []
+    for label in class_labels:
+        nutrition = get_nutrition_info(label)
+        weight = food_weight / len(class_labels)
+        
+        protein = round(nutrition['prot'] * weight, 3)
+        fat = round(nutrition['fat'] * weight, 3)
+        carb = round(nutrition['carbs'] * weight, 3)
+
+        label_info = {
+            'food_name': label,
+            'nutrition_info': {
+                'weight': weight,
+                'protein': protein,
+                'fat': fat,
+                'carb': carb
+            }
+        }
+        nutrition_info.append(label_info)
+
+    # 200: Success
+    response = {
+        'status': True,
+        'message': 'Food Successfully Scanned!',
+        'data': nutrition_info
+    }
+    return jsonify(response), 200
+
 
 
 # Initialize Flask
