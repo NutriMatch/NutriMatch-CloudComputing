@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
-from firebase_admin import credentials, db, auth, storage
+from firebase_admin import credentials, db, auth
 from config import secret_key
 from config import FIREBASE_AUTH_API
 from datetime import datetime
@@ -509,6 +509,127 @@ def change_password():
 
 
 # ------------ MASTER --------------
+model = load_model('model.h5')
+
+# SCAN NUTRITION
+@app.route('/master/scan_nutrition', methods=['POST'])
+def scan_nutrition():
+    # Get the user's access token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_query = users_ref.order_by_child('email').equal_to(user_email).get()
+
+        user_id = None
+        for key in user_query:
+            user_id = key
+            break
+
+        if user_id is None:
+            response = {
+                'status': False,
+                'message': 'User not found in the database',
+                'data': None
+            }
+            return jsonify(response), 404
+
+        food_image = request.files['food_image']
+        food_weight = float(request.form['food_weight'])
+
+        meal_category = categorize_meal()
+
+        # Load Image
+        img = load_img(io.BytesIO(food_image.read()), target_size=(150, 150))
+        x = img_to_array(img)
+        x /= 255
+        x = np.expand_dims(x, axis=0)
+        images = np.vstack([x])
+
+        # ML detection
+        classes = model.predict(images, batch_size=1)
+
+        # Detection Confidence
+        threshold = 0.85
+        class_indices = np.where(classes[0] > threshold)[0]
+
+        # Get Detected Label
+        class_labels = get_class_labels(class_indices)
+
+        # 401: Failed to scan
+        if len(class_labels) == 0:
+            # 401: Failed to scan
+            response = {
+                'status': False,
+                'message': 'Failed to scan food',
+                'data': []
+            }
+            return jsonify(response), 401
+
+        # Calculate nutrition for each label
+        foods = []
+        for label in class_labels:
+            nutrition = get_nutrition_info(label)
+            weight = food_weight / len(class_labels)
+
+            protein = round(nutrition['prot'] * weight, 3)
+            fat = round(nutrition['fat'] * weight, 3)
+            carb = round(nutrition['carbs'] * weight, 3)
+
+            label_info = {
+                'food_title': label,
+                'nutrition_info': {
+                    'weight': weight,
+                    'protein': protein,
+                    'fat': fat,
+                    'carb': carb
+                }
+            }
+            foods.append(label_info)
+
+        # Store data in the real-time database
+        store_food_data(user_id, meal_category, foods)
+
+        # 200: Success
+        response = {
+            'status': True,
+            'message': 'Food Successfully Scanned!',
+            'data': foods
+        }
+        return jsonify(response), 200
+
+    except jwt.ExpiredSignatureError:
+        response = {
+            'status': False,
+            'message': 'Expired access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    except jwt.InvalidTokenError:
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+
+
 # DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
 def get_calories_needed():
@@ -632,72 +753,6 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
-
-
-model = load_model('model.h5')
-
-# SCAN NUTRITION
-@app.route('/master/scan_nutrition', methods=['POST'])
-def scan_nutrition():
-    food_image = request.files['food_image']
-    food_title = request.form['food_title']
-    food_weight = float(request.form['food_weight'])
-
-    # Load Image
-    img = load_img(io.BytesIO(food_image.read()), target_size=(150, 150))
-    x = img_to_array(img)
-    x /= 255
-    x = np.expand_dims(x, axis=0)
-    images = np.vstack([x])
-
-    # ML detection
-    classes = model.predict(images, batch_size=1)
-
-    # Detection Confidence
-    threshold = 0.9999 
-    class_indices = np.where(classes[0] > threshold)[0]
-
-    # Get Detected Label
-    class_labels = get_class_labels(class_indices)
-
-    # 401: Failed to scan
-    if len(class_labels) == 0:
-        # 401: Failed to scan
-        response = {
-            'status': False,
-            'message': 'Failed to scan food',
-            'data': []
-        }
-        return jsonify(response), 401
-
-    # Calculate nutrition for each label
-    nutrition_info = []
-    for label in class_labels:
-        nutrition = get_nutrition_info(label)
-        weight = food_weight / len(class_labels)
-        
-        protein = round(nutrition['prot'] * weight, 3)
-        fat = round(nutrition['fat'] * weight, 3)
-        carb = round(nutrition['carbs'] * weight, 3)
-
-        label_info = {
-            'food_name': label,
-            'nutrition_info': {
-                'weight': weight,
-                'protein': protein,
-                'fat': fat,
-                'carb': carb
-            }
-        }
-        nutrition_info.append(label_info)
-
-    # 200: Success
-    response = {
-        'status': True,
-        'message': 'Food Successfully Scanned!',
-        'data': nutrition_info
-    }
-    return jsonify(response), 200
 
 
 

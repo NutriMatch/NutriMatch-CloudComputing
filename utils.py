@@ -1,7 +1,7 @@
 import re
 import jwt
 from datetime import datetime
-from firebase_admin import db
+from firebase_admin import db, auth
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -67,9 +67,34 @@ def calculate_calories_needed(weight, height, age, gender, activity_level):
 
 def get_nutrition_info(label):
     ref = db.reference('food_nutrients/' + label)
-    nutrition_info = ref.get()
-    return nutrition_info
+    foods = ref.get()
+    return foods
 
 def get_class_labels(class_indices):
     class_labels = ["ayam", "nasi", "telur", "brokoli", "ikan", "jeruk", "mie", "roti", "tahu", "tempe"]
     return [class_labels[idx] for idx in class_indices]
+
+def categorize_meal():
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    
+    # Categorize the meal based on the time of day
+    if current_time < "10:00:00":
+        return "breakfast"
+    elif current_time < "15:00:00":
+        return "lunch"
+    else:
+        return "dinner"
+
+def store_food_data(user_id, meal_category, foods):
+    user_food_ref = db.reference('user_food')
+    new_food_entry = user_food_ref.push()
+
+    new_food_entry.set({
+        'user_id': user_id,
+        'category': meal_category
+    })
+
+    for index, label_info in enumerate(foods):
+        food_entry = new_food_entry.child(f'food_{index}')
+        food_entry.set(label_info)
