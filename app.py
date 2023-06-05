@@ -675,8 +675,10 @@ def submit_manual():
     
     food_image = request.files['food_image']
     name = request.form['name']
-    weight = request.form['weight']
-    calories = request.form['calories']
+    weight = int(request.form['weight'])
+    calories = int(request.form['calories'])
+
+    meal_category = categorize_meal()
     
     # Check if all required fields are present in the request
     if not name or not weight or not calories:
@@ -687,39 +689,24 @@ def submit_manual():
         }
         return jsonify(response), 400
 
-    # Validate weight is a valid integer
-    try:
-        weight = int(weight)
-    except ValueError:
-        response = {
-            'status': False,
-            'message': 'Invalid weight value!',
-            'data': None
+    foods = []
+    # Calculate nutrient values based on calorie
+    protein = round(calories * 0.2 / 4, 3)
+    carbs = round(calories * 0.5 / 4, 3)
+    fat = round(calories * 0.3 / 9, 3)
+
+    food_info = {
+        'food_title': name,
+            'nutrition_info': {
+                'weight': weight,
+                'protein': protein,
+                'fat': fat,
+                'carb': carbs
         }
-        return jsonify(response), 400
-    
-    # Validate calories is a valid integer
-    try:
-        calories = int(calories)
-    except ValueError:
-        response = {
-            'status': False,
-            'message': 'Invalid calories value!',
-            'data': None
-        }
-        return jsonify(response), 400
-
-
-    # In-memory storage for submitted foods
-    nutrition_info = []
-
-    # Store the submitted food details
-    food = {
-        'name': name,
-        'weight': weight,
-        'calories': calories
     }
-    nutrition_info.append(food)
+    foods.append(food_info)
+
+    store_food_data(user_id, meal_category, foods)  
 
     # Return success response
     response = {
