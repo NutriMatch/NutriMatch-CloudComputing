@@ -584,11 +584,11 @@ def scan_nutrition():
         foods = []
         for label in class_labels:
             nutrition = get_nutrition_info(label)
-            weight = food_weight / len(class_labels)
+            weight = round(food_weight / len(class_labels), 2)
 
-            protein = round(nutrition['prot'] * weight, 3)
-            fat = round(nutrition['fat'] * weight, 3)
-            carb = round(nutrition['carbs'] * weight, 3)
+            protein = round(nutrition['prot'] * weight, 2)
+            fat = round(nutrition['fat'] * weight, 2)
+            carb = round(nutrition['carbs'] * weight, 2)
 
             label_info = {
                 'food_title': label,
@@ -600,9 +600,6 @@ def scan_nutrition():
                 }
             }
             foods.append(label_info)
-
-        # Store data in the real-time database
-        store_food_data(user_id, meal_category, foods)
 
         # 200: Success
         response = {
@@ -628,6 +625,7 @@ def scan_nutrition():
         }
         return jsonify(response), 401
 
+# SUBMIT MANUAL
 @app.route('/master/submit_manual', methods=['POST'])
 def submit_manual():
     # Get the user's access token from the request headers
@@ -691,12 +689,12 @@ def submit_manual():
 
     foods = []
     # Calculate nutrient values based on calorie
-    protein = round(calories * 0.2 / 4, 3)
-    carbs = round(calories * 0.5 / 4, 3)
-    fat = round(calories * 0.3 / 9, 3)
+    protein = round(calories * 0.2 / 4, 2)
+    carbs = round(calories * 0.5 / 4, 2)
+    fat = round(calories * 0.3 / 9, 2)
 
     food_info = {
-        'food_title': name,
+        'name': name,
             'nutrition_info': {
                 'weight': weight,
                 'protein': protein,
@@ -715,6 +713,8 @@ def submit_manual():
         'data': None
     }
     return jsonify(response), 200
+
+# SCAN FOOD
 
 # DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
