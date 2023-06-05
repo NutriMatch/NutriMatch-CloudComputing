@@ -628,7 +628,106 @@ def scan_nutrition():
         }
         return jsonify(response), 401
 
+@app.route('/master/submit_manual', methods=['POST'])
+def submit_manual():
+    # Get the user's access token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
+        }
+        return jsonify(response), 401
 
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_query = users_ref.order_by_child('email').equal_to(user_email).get()
+
+        user_id = None
+        for key in user_query:
+            user_id = key
+            break
+
+        if user_id is None:
+            response = {
+                'status': False,
+                'message': 'User not found in the database',
+                'data': None
+            }
+            return jsonify(response), 404
+
+    except KeyError:
+        # 401:Unauthorized
+        response = {
+            'status': False,
+            'message': 'Failed to submit!',
+            'data': None
+        }
+        return jsonify(response), 401
+    
+    food_image = request.files['food_image']
+    name = request.form['name']
+    weight = request.form['weight']
+    calories = request.form['calories']
+    
+    # Check if all required fields are present in the request
+    if not name or not weight or not calories:
+        response = {
+            'status': False,
+            'message': 'Failed to submit!',
+            'data': None
+        }
+        return jsonify(response), 400
+
+    # Validate weight is a valid integer
+    try:
+        weight = int(weight)
+    except ValueError:
+        response = {
+            'status': False,
+            'message': 'Invalid weight value!',
+            'data': None
+        }
+        return jsonify(response), 400
+    
+    # Validate calories is a valid integer
+    try:
+        calories = int(calories)
+    except ValueError:
+        response = {
+            'status': False,
+            'message': 'Invalid calories value!',
+            'data': None
+        }
+        return jsonify(response), 400
+
+
+    # In-memory storage for submitted foods
+    nutrition_info = []
+
+    # Store the submitted food details
+    food = {
+        'name': name,
+        'weight': weight,
+        'calories': calories
+    }
+    nutrition_info.append(food)
+
+    # Return success response
+    response = {
+        'status': True,
+        'message': 'Food Successfully Submitted!',
+        'data': None
+    }
+    return jsonify(response), 200
 
 # DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
@@ -753,7 +852,6 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
-
 
 
 # Initialize Flask
