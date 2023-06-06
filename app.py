@@ -582,11 +582,11 @@ def scan_nutrition():
         foods = []
         for label in class_labels:
             nutrition = get_nutrition_info(label)
-            weight = food_weight / len(class_labels)
+            weight = round(food_weight / len(class_labels), 2)
 
-            protein = round(nutrition['prot'] * weight, 3)
-            fat = round(nutrition['fat'] * weight, 3)
-            carb = round(nutrition['carbs'] * weight, 3)
+            protein = round(nutrition['prot'] * weight, 2)
+            fat = round(nutrition['fat'] * weight, 2)
+            carb = round(nutrition['carbs'] * weight, 2)
 
             label_info = {
                 'food_title': label,
@@ -622,106 +622,6 @@ def scan_nutrition():
             'data': None
         }
         return jsonify(response), 401
-
-@app.route('/master/submit_food', methods=['POST'])
-def submit_food():
-        # Get the user's access token from the request headers
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        response = {
-            'status': False,
-            'message': 'Invalid access token!',
-            'data': None
-        }
-        return jsonify(response), 401
-
-    access_token = auth_header.split(' ')[1]
-        # Get the user's access token from the request headers
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        response = {
-            'status': False,
-            'message': 'Invalid access token!',
-            'data': None
-        }
-        return jsonify(response), 401
-
-    access_token = auth_header.split(' ')[1]
-
-    try:
-        # Verify the access token
-        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
-        user_email = payload['sub']
-
-        # Get user data from Realtime Database
-        users_ref = db.reference('users')
-        user_query = users_ref.order_by_child('email').equal_to(user_email).get()
-
-        user_id = None
-        for key in user_query:
-            user_id = key
-            break
-
-        if user_id is None:
-            response = {
-                'status': False,
-                'message': 'User not found in the database',
-                'data': None
-            }
-            return jsonify(response), 404
-
-    except KeyError:
-        # 401:Unauthorized
-        response = {
-            'status': False,
-            'message': 'Failed to submit!',
-            'data': None
-        }
-        return jsonify(response), 401
-    
-    food_image = request.files.get('food_image')
-    names = []
-    weights = []
-    proteins = []
-    carbs = []
-    fats = []
-
-    
-    for i in range(len(request.form)):
-        name_key = f'food[{i}][name]'
-        weight_key = f'food[{i}][weight]'
-        protein_key = f'food[{i}][protein]'
-        carb_key = f'food[{i}][carb]'
-        fat_key = f'food[{i}][fat]'
-        
-        if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
-            names.append(request.form[name_key])
-            weights.append(request.form[weight_key])
-            proteins.append(request.form[weight_key])
-            carbs.append(request.form[weight_key])
-            fats.append(request.form[weight_key])            
-
-    foods = []
-    for name, weight, protein, carb, fat in zip(names, weights, proteins, carbs, fats):
-        label_info = {
-            'name': name,
-            'weight': weight,
-            'protein': protein,
-            'carb': carb,
-            'fat': fat,
-        }
-        foods.append(label_info)
-    
-    meal_category = categorize_meal()
-    store_food_data(user_id, meal_category, foods)
-
-    response = {
-        'status': True,
-        'message': 'Food Successfully Submit!',
-        'data': None
-    }
-    return jsonify(response), 200
-
 
 @app.route('/master/submit_manual', methods=['POST'])
 def submit_manual():
@@ -808,12 +708,12 @@ def submit_manual():
     
     foods = []
     # Calculate nutrient values based on calorie
-    protein = round(calories * 0.2 / 4, 3)
-    carbs = round(calories * 0.5 / 4, 3)
-    fat = round(calories * 0.3 / 9, 3)
+    protein = round(calories * 0.2 / 4, 2)
+    carbs = round(calories * 0.5 / 4, 2)
+    fat = round(calories * 0.3 / 9, 2)
 
     food_info = {
-        'food_title': name,
+        'name': name,
             'nutrition_info': {
                 'weight': weight,
                 'protein': protein,
@@ -822,6 +722,7 @@ def submit_manual():
         }
     }
     foods.append(food_info)
+    meal_category = categorize_meal()
 
     store_food_data(user_id, meal_category, foods)  
 
@@ -832,6 +733,102 @@ def submit_manual():
         'data': None
     }
     return jsonify(response), 200
+
+# SUBMIT FOOD
+@app.route('/master/submit_food', methods=['POST'])
+def submit_food():
+    # Get the user's access token from the request headers
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        response = {
+            'status': False,
+            'message': 'Invalid access token!',
+            'data': None
+        }
+        return jsonify(response), 401
+
+    access_token = auth_header.split(' ')[1]
+
+    try:
+        # Verify the access token
+        payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
+        user_email = payload['sub']
+
+        # Get user data from Realtime Database
+        users_ref = db.reference('users')
+        user_query = users_ref.order_by_child('email').equal_to(user_email).get()
+
+        user_id = None
+        for key in user_query:
+            user_id = key
+            break
+
+        if user_id is None:
+            response = {
+                'status': False,
+                'message': 'User not found in the database',
+                'data': None
+            }
+            return jsonify(response), 404
+
+    except KeyError:
+        # 401:Unauthorized
+        response = {
+            'status': False,
+            'message': 'Failed to submit!',
+            'data': None
+        }
+        return jsonify(response), 401
+    
+    food_image = request.files.get('food_image')
+    names = []
+    weights = []
+    proteins = []
+    carbs = []
+    fats = []
+
+    
+    for i in range(len(request.form)):
+        name_key = f'food[{i}][name]'
+        weight_key = f'food[{i}][weight]'
+        protein_key = f'food[{i}][protein]'
+        carb_key = f'food[{i}][carb]'
+        fat_key = f'food[{i}][fat]'
+        
+        if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
+            names.append(request.form[name_key])
+            weights.append(request.form[weight_key])
+            proteins.append(request.form[weight_key])
+            carbs.append(request.form[weight_key])
+            fats.append(request.form[weight_key])            
+
+    foods = []
+    for name, weight, protein, carb, fat in zip(names, weights, proteins, carbs, fats):
+        label_info = {
+            'name': name,
+            'weight': weight,
+            'protein': protein,
+            'carb': carb,
+            'fat': fat,
+        }
+        foods.append(label_info)
+
+    store_food_data(user_id, meal_category, foods)
+
+    response = {
+        'status': True,
+        'message': 'Success',
+        'data': None
+    }
+    return jsonify(response), 200
+
+
+
+
+# DASHBOARD
+# @app.route('/master/test', methods=['POST'])
+# def test():
+
 
 # DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
