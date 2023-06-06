@@ -772,15 +772,14 @@ def submit_food():
             return jsonify(response), 404
 
     except KeyError:
-        # 401:Unauthorized
+        # 400: Bad Request
         response = {
             'status': False,
             'message': 'Failed to submit!',
             'data': None
         }
-        return jsonify(response), 401
+        return jsonify(response), 400
     
-    food_image = request.files.get('food_image')
     names = []
     weights = []
     proteins = []
@@ -798,36 +797,42 @@ def submit_food():
         if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
             names.append(request.form[name_key])
             weights.append(request.form[weight_key])
-            proteins.append(request.form[weight_key])
-            carbs.append(request.form[weight_key])
-            fats.append(request.form[weight_key])            
-
+            proteins.append(request.form[protein_key])
+            fats.append(request.form[fat_key])            
+            carbs.append(request.form[carb_key])
+            
     foods = []
-    for name, weight, protein, carb, fat in zip(names, weights, proteins, carbs, fats):
+    for name, weight, protein, fat, carb in zip(names, weights, proteins, fats, carbs):
         label_info = {
             'name': name,
-            'weight': weight,
-            'protein': protein,
-            'carb': carb,
-            'fat': fat,
+            'nutrition_info':{
+                'weight': weight,
+                'protein': protein,
+                'fat': fat,
+                'carb': carb,
+            }
         }
         foods.append(label_info)
+    
+    # Check if all required fields are present in the request
+    if not name or not weight or not protein or not fat or not carb :
+        response = {
+            'status': False,
+            'message': 'All fields are required!',
+            'data': None
+        }
+        return jsonify(response), 400
 
+    
+    meal_category = categorize_meal()
     store_food_data(user_id, meal_category, foods)
 
     response = {
         'status': True,
-        'message': 'Success',
+        'message': 'Food Successfully Submit!',
         'data': None
     }
     return jsonify(response), 200
-
-
-
-
-# DASHBOARD
-# @app.route('/master/test', methods=['POST'])
-# def test():
 
 
 # DASHBOARD
