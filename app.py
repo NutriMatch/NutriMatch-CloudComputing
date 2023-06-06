@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
-from firebase_admin import credentials, db, auth
+from firebase_admin import credentials, db, auth, storage
 from config import secret_key
 from config import FIREBASE_AUTH_API
 from datetime import datetime
@@ -17,8 +17,13 @@ import jwt
 # Initialize Firebase
 cred = credentials.Certificate('serviceAccountKey1.json')
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://capstone-project-nutrimatch-default-rtdb.asia-southeast1.firebasedatabase.app/'
+    'databaseURL': 'https://capstone-project-nutrimatch-default-rtdb.asia-southeast1.firebasedatabase.app/',
+    'storageBucket': 'capstone-project-nutrimatch.appspot.com'
+
 })
+
+#get the storage bucket object
+bucket = storage.bucket() 
 
 # Initialize Flask
 app = Flask(__name__)
@@ -673,6 +678,20 @@ def submit_manual():
     weight = request.form['weight']
     calories = request.form['calories']
 
+    food_image = request.files.get('food_image')
+    if not food_image:
+        response = {
+            'status': False,
+            'message': 'Food image is required!',
+            'data': None
+        }
+        return jsonify(response), 400
+    
+    # Upload gambar ke Firebase Storage
+    file_name = food_image.filename
+    blob = bucket.blob(file_name)
+    blob.upload_from_file(food_image)
+    
      # Check if all required fields are present in the request
     if not name or not weight or not calories:
         response = {
@@ -734,6 +753,7 @@ def submit_manual():
     }
     return jsonify(response), 200
 
+  
 # SUBMIT FOOD
 @app.route('/master/submit_food', methods=['POST'])
 def submit_food():
@@ -780,13 +800,26 @@ def submit_food():
         }
         return jsonify(response), 400
     
+    food_image = request.files.get('food_image')
+    if not food_image:
+        response = {
+            'status': False,
+            'message': 'Food image is required!',
+            'data': None
+        }
+        return jsonify(response), 400
+    
+    # Upload gambar ke Firebase Storage
+    file_name = food_image.filename
+    blob = bucket.blob(file_name)
+    blob.upload_from_file(food_image)
+
     names = []
     weights = []
     proteins = []
     carbs = []
     fats = []
 
-    
     for i in range(len(request.form)):
         name_key = f'food[{i}][name]'
         weight_key = f'food[{i}][weight]'
