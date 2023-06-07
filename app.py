@@ -9,6 +9,7 @@ import numpy as np
 from tensorflow.keras.utils import load_img, img_to_array
 from tensorflow.keras.models import load_model
 from PIL import Image
+from datetime import date
 import io
 import requests
 import jwt
@@ -840,7 +841,6 @@ def submit_food():
         return jsonify(response), 400
 
 
-# DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
 def get_calories_needed():
     auth_header = request.headers.get('Authorization')
@@ -868,9 +868,19 @@ def get_calories_needed():
         # Get body measurement data
         body_measurement_ref = db.reference('body_measurements')
         query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
+
+        # Check if query is empty
+        if not query:
+            response = {
+                'status': False,
+                'message': 'No body measurement data found',
+                'data': None
+            }
+            return jsonify(response), 404
+
         measurement_id = list(query.keys())[0]
 
-        # Data need for calculation
+        # Data needed for calculation
         weight = query[measurement_id]['weight']
         height = query[measurement_id]['height']
         gender = query[measurement_id]['gender']
@@ -878,7 +888,7 @@ def get_calories_needed():
 
         # Retrieve user_id
         user_id = list(user_data.keys())[0]
-        
+
         # Calculate calories needed
         age = calculate_age(user_data[user_id]['birthday'])
         calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
@@ -897,6 +907,60 @@ def get_calories_needed():
         fat = calories_needed * 0.25 / 9
         carbohydrate = calories_needed * 0.55 / 4
 
+        # Get today's date
+        today = date.today().isoformat()
+
+        # Retrieve user's food entries for today
+        food_ref = db.reference('user_food')
+        query = food_ref.order_by_child('user_id').equal_to(user_id).get()
+        food_entries = [query[key] for key in query if query[key]['category'] == today]
+
+        # Calculate total calories, protein, carbs, and fat
+        total_calories = sum(entry['calories'] for entry in food_entries)
+        total_protein = sum(entry['food_{}'.format(i)]['protein'] for entry in food_entries for i in range(len(entry)))
+        total_carbs = sum(entry['food_{}'.format(i)]['carb'] for entry in food_entries for i in range(len(entry)))
+        total_fat = sum(entry['food_{}'.format(i)]['fat'] for entry in food_entries for i in range(len(entry)))
+
+        # Assign current values to the graph
+        graph = {
+            'calories': {
+                'target': calories_needed,
+                'current': total_calories
+            },
+            'protein': {
+                'target': protein,
+                'current': total_protein
+            },
+            'fat': {
+                'target': fat,
+                'current': total_fat
+            },
+            'carbs': {
+                'target': carbohydrate,
+                'current': total_carbs
+            }
+        }
+
+        # Prepare the history_food dictionary
+        history_food = {
+            'breakfast': [],
+            'lunch': [],
+            'dinner': []
+        }
+
+        # Filter food entries by category and add to history_food
+        for entry in food_entries:
+            category = entry['category']
+            food_list = []
+            for i in range(len(entry)):
+                key = 'food_{}'.format(i)
+                if key in entry:
+                    food_name = entry[key]['name']
+                    food_list.append({'get_makanan_user': food_name})
+            history_food[category.lower()] = food_list
+
+
+
         # 200: Success
         user_response = {
             'id': user_id,
@@ -904,42 +968,11 @@ def get_calories_needed():
             'email': user_email,
             'birthday': user_data[user_id]['birthday'],
             'body_measurement': {
-                'height': query[measurement_id]['height'],
-                'weight': query[measurement_id]['weight'],
-                'activity_level': query[measurement_id]['activity_level'],
-                'gender': query[measurement_id]['gender']
+                'height': height,
+                'weight': weight,
+                'activity_level': activity_level,
+                'gender': gender
             }
-        }
-
-        graph = {
-            'calories':{
-                'target': calories_needed,
-                'current': None
-            },
-            'protein': {
-                'target': protein,
-                'current': None
-            },
-            'fat': {
-                'target': fat,
-                'current': None
-            },
-            'carbs': {
-                'target': carbohydrate,
-                'current': None
-            }
-        }
-
-        history_food = {
-            'breakfast':[{
-                'get_makanan_user': None #get makanan user 
-            }],
-            'lunch':[{
-                'get_makanan_user': None #get makanan user 
-            }],
-            'dinner':[{
-                'get_makanan_user': None #get makanan user 
-            }]
         }
 
         response = {
@@ -960,6 +993,9 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
+
+
+
 
 
 # Initialize Flask
