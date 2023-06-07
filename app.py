@@ -4,7 +4,6 @@ import firebase_admin
 from firebase_admin import credentials, db, auth, storage
 from config import secret_key
 from config import FIREBASE_AUTH_API
-from datetime import datetime
 from utils import *
 import numpy as np
 from tensorflow.keras.utils import load_img, img_to_array
@@ -19,11 +18,7 @@ cred = credentials.Certificate('serviceAccountKey1.json')
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://capstone-project-nutrimatch-default-rtdb.asia-southeast1.firebasedatabase.app/',
     'storageBucket': 'capstone-project-nutrimatch.appspot.com'
-
 })
-
-#get the storage bucket object
-bucket = storage.bucket() 
 
 # Initialize Flask
 app = Flask(__name__)
@@ -628,6 +623,7 @@ def scan_nutrition():
         }
         return jsonify(response), 401
 
+# SUMBIT MANUAL
 @app.route('/master/submit_manual', methods=['POST'])
 def submit_manual():
     # Get the user's access token from the request headers
@@ -663,96 +659,76 @@ def submit_manual():
                 'data': None
             }
             return jsonify(response), 404
+        
+        # Request
+        food_image = request.files['food_image']
+        name = request.form['name']
+        weight = request.form['weight']
+        calories = request.form['calories']
+        
+        # 400: Bad Request
+        if not name or not weight or not calories:
+            response = {
+                'status': False,
+                'message': 'Failed to submit!',
+                'data': None
+            }
+            return jsonify(response), 400
 
+        try:
+            weight = int(weight)
+            calories = int(calories)
+        except ValueError:
+            response = {
+                'status': False,
+                'message': 'Invalid value!',
+                'data': None
+            }
+            return jsonify(response), 400
+        
+
+        # Calculate nutrient values based on calorie
+        protein = round(calories * 0.2 / 4, 2)
+        carbs = round(calories * 0.5 / 4, 2)
+        fat = round(calories * 0.3 / 9, 2)
+
+        meal_category = categorize_meal()
+        
+        foods = []
+        food_info = {
+            'name': name,
+                'nutrition_info': {
+                    'weight': weight,
+                    'protein': protein,
+                    'fat': fat,
+                    'carb': carbs
+            }
+        }
+        foods.append(food_info)
+        meal_category = categorize_meal()
+
+        # Upload and retrive image URL            
+        image_url = upload_food_image(food_image)
+
+        # Store data to Realtime Database
+        store_food_data(user_id, image_url, meal_category, foods)  
+
+        # 200: Success
+        response = {
+            'status': True,
+            'message': 'Food Successfully Submit!',
+            'data': None
+        }
+        return jsonify(response), 200
+
+    # 401: Unauthorized
     except KeyError:
-        # 401:Unauthorized
         response = {
             'status': False,
             'message': 'Failed to submit!',
             'data': None
         }
         return jsonify(response), 401
-    
-    food_image = request.files['food_image']
-    name = request.form['name']
-    weight = request.form['weight']
-    calories = request.form['calories']
-
-    food_image = request.files.get('food_image')
-    if not food_image:
-        response = {
-            'status': False,
-            'message': 'Food image is required!',
-            'data': None
-        }
-        return jsonify(response), 400
-    
-    # Upload gambar ke Firebase Storage
-    file_name = food_image.filename
-    blob = bucket.blob(file_name)
-    blob.upload_from_file(food_image)
-    
-     # Check if all required fields are present in the request
-    if not name or not weight or not calories:
-        response = {
-            'status': False,
-            'message': 'Failed to submit!',
-            'data': None
-        }
-        return jsonify(response), 400
-
-    # Validate weight is a valid integer
-    try:
-        weight = int(weight)
-    except ValueError:
-        response = {
-            'status': False,
-            'message': 'Invalid weight value!',
-            'data': None
-        }
-        return jsonify(response), 400
-    
-    # Validate calories is a valid integer
-    try:
-        calories = int(calories)
-    except ValueError:
-        response = {
-            'status': False,
-            'message': 'Invalid calories value!',
-            'data': None
-        }
-        return jsonify(response), 400
-
-    meal_category = categorize_meal()
-    
-    foods = []
-    # Calculate nutrient values based on calorie
-    protein = round(calories * 0.2 / 4, 2)
-    carbs = round(calories * 0.5 / 4, 2)
-    fat = round(calories * 0.3 / 9, 2)
-
-    food_info = {
-        'name': name,
-            'nutrition_info': {
-                'weight': weight,
-                'protein': protein,
-                'fat': fat,
-                'carb': carbs
-        }
-    }
-    foods.append(food_info)
-    meal_category = categorize_meal()
-
-    store_food_data(user_id, meal_category, foods)  
-
-    # Return success response
-    response = {
-        'status': True,
-        'message': 'Food Successfully Submit!',
-        'data': None
-    }
-    return jsonify(response), 200
-
   
 # SUBMIT FOOD
 @app.route('/master/submit_food', methods=['POST'])
@@ -790,83 +766,74 @@ def submit_food():
                 'data': None
             }
             return jsonify(response), 404
+    
+        # Request
+        food_image = request.files['food_image']
+        names = []
+        weights = []
+        proteins = []
+        carbs = []
+        fats = []
 
-    except KeyError:
+        for i in range(len(request.form)):
+            name_key = f'food[{i}][name]'
+            weight_key = f'food[{i}][weight]'
+            protein_key = f'food[{i}][protein]'
+            carb_key = f'food[{i}][carb]'
+            fat_key = f'food[{i}][fat]'
+            
+            if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
+                names.append(request.form[name_key])
+                weights.append(request.form[weight_key])
+                proteins.append(request.form[protein_key])
+                fats.append(request.form[fat_key])            
+                carbs.append(request.form[carb_key])
+                
+        foods = []
+        for name, weight, protein, fat, carb in zip(names, weights, proteins, fats, carbs):
+            label_info = {
+                'name': name,
+                'nutrition_info':{
+                    'weight': weight,
+                    'protein': protein,
+                    'fat': fat,
+                    'carb': carb,
+                }
+            }
+            foods.append(label_info)
+        
         # 400: Bad Request
+        if not name or not weight or not protein or not fat or not carb :
+            response = {
+                'status': False,
+                'message': 'All fields are required!',
+                'data': None
+            }
+            return jsonify(response), 400
+
+        meal_category = categorize_meal()
+        
+        # Upload and retrive image URL            
+        image_url = upload_food_image(food_image)
+
+        # Store data to Realtime Database
+        store_food_data(user_id, image_url, meal_category, foods) 
+
+        response = {
+            'status': True,
+            'message': 'Food Successfully Submit!',
+            'data': None
+        }
+        return jsonify(response), 200
+
+    # 400: Bad Request
+    except KeyError:
         response = {
             'status': False,
             'message': 'Failed to submit!',
             'data': None
         }
         return jsonify(response), 400
-    
-    food_image = request.files.get('food_image')
-    if not food_image:
-        response = {
-            'status': False,
-            'message': 'Food image is required!',
-            'data': None
-        }
-        return jsonify(response), 400
-    
-    # Upload gambar ke Firebase Storage
-    file_name = food_image.filename
-    blob = bucket.blob(file_name)
-    blob.upload_from_file(food_image)
-
-    names = []
-    weights = []
-    proteins = []
-    carbs = []
-    fats = []
-
-    for i in range(len(request.form)):
-        name_key = f'food[{i}][name]'
-        weight_key = f'food[{i}][weight]'
-        protein_key = f'food[{i}][protein]'
-        carb_key = f'food[{i}][carb]'
-        fat_key = f'food[{i}][fat]'
-        
-        if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
-            names.append(request.form[name_key])
-            weights.append(request.form[weight_key])
-            proteins.append(request.form[protein_key])
-            fats.append(request.form[fat_key])            
-            carbs.append(request.form[carb_key])
-            
-    foods = []
-    for name, weight, protein, fat, carb in zip(names, weights, proteins, fats, carbs):
-        label_info = {
-            'name': name,
-            'nutrition_info':{
-                'weight': weight,
-                'protein': protein,
-                'fat': fat,
-                'carb': carb,
-            }
-        }
-        foods.append(label_info)
-    
-    # Check if all required fields are present in the request
-    if not name or not weight or not protein or not fat or not carb :
-        response = {
-            'status': False,
-            'message': 'All fields are required!',
-            'data': None
-        }
-        return jsonify(response), 400
-
-    
-    meal_category = categorize_meal()
-    store_food_data(user_id, meal_category, foods)
-
-    response = {
-        'status': True,
-        'message': 'Food Successfully Submit!',
-        'data': None
-    }
-    return jsonify(response), 200
-
 
 # DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])

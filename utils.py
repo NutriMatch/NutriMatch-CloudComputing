@@ -1,7 +1,7 @@
 import re
 import jwt
 from datetime import datetime
-from firebase_admin import db, auth
+from firebase_admin import db, auth, storage, initialize_app
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -86,15 +86,28 @@ def categorize_meal():
     else:
         return "dinner"
 
-def store_food_data(user_id, meal_category, foods):
+def store_food_data(user_id, image_url, meal_category, foods):
     user_food_ref = db.reference('user_food')
     new_food_entry = user_food_ref.push()
 
     new_food_entry.set({
         'user_id': user_id,
+        'image_url': image_url,
         'category': meal_category
     })
 
     for index, label_info in enumerate(foods):
         food_entry = new_food_entry.child(f'food_{index}')
         food_entry.set(label_info)
+
+def upload_food_image(file):
+    bucket = storage.bucket()
+
+    file_name = file.filename
+    blob = bucket.blob(file_name)
+    blob.upload_from_file(file)
+    
+    # Return the public URL of the uploaded image
+    image_url = blob.public_url
+    
+    return image_url
