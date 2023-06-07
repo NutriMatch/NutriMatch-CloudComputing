@@ -903,10 +903,10 @@ def get_calories_needed():
 
         # Calculation
         # (protein: 10-35% calori, fat: 20-35%, carbs: 45-65%)
-        protein = round(calories_needed * 0.15 / 4, 2)
-        fat = round(calories_needed * 0.25 / 9, 2)
-        carbohydrate = round(calories_needed * 0.55 / 4, 2)
-
+        protein = round(calories_needed * 0.2 / 4, 2)
+        carbohydrate = round(calories_needed * 0.5 / 4, 2)
+        fat = round(calories_needed * 0.3 / 9, 2)
+        
         # Get today's date
         today = date.today().isoformat()
 
