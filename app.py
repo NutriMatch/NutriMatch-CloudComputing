@@ -689,9 +689,9 @@ def submit_manual():
         
 
         # Calculate nutrient values based on calorie
-        protein = round(calories * 0.2 / 4, 2)
+        proteins = round(calories * 0.2 / 4, 2)
         carbs = round(calories * 0.5 / 4, 2)
-        fat = round(calories * 0.3 / 9, 2)
+        fats = round(calories * 0.3 / 9, 2)
 
         meal_category = categorize_meal()
         
@@ -699,8 +699,8 @@ def submit_manual():
         food_info = {
             'name': name,
             'weight': weight,
-            'protein': protein,
-            'fat': fat,
+            'protein': proteins,
+            'fat': fats,
             'carb': carbs
         }
         foods.append(food_info)
@@ -711,7 +711,7 @@ def submit_manual():
         image_url = upload_food_image(food_image)
 
         # Store data to Realtime Database
-        store_food_data(user_id, image_url, meal_category, calories, foods)  
+        store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods)  
 
         # 200: Success
         response = {
@@ -772,17 +772,17 @@ def submit_food():
         names = []
         weights = []
         proteins = []
-        carbs = []
         fats = []
+        carbs = []
 
         for i in range(len(request.form)):
             name_key = f'food[{i}][name]'
             weight_key = f'food[{i}][weight]'
             protein_key = f'food[{i}][protein]'
-            carb_key = f'food[{i}][carb]'
             fat_key = f'food[{i}][fat]'
+            carb_key = f'food[{i}][carb]'
             
-            if all(key in request.form for key in [name_key, weight_key, protein_key, carb_key, fat_key]):
+            if all(key in request.form for key in [name_key, weight_key, protein_key, fat_key, carb_key]):
                 names.append(request.form[name_key])
                 weights.append(float(request.form[weight_key]))
                 proteins.append(float(request.form[protein_key]))
@@ -791,6 +791,9 @@ def submit_food():
                 
         foods = []
         total_calories = 0
+        total_protein = 0
+        total_fat = 0
+        total_carb = 0
 
         for name, weight, protein, fat, carb in zip(names, weights, proteins, fats, carbs):
             label_info = {
@@ -805,6 +808,9 @@ def submit_food():
             # Calculate calories for the current food item
             calories = (protein * 4) + (carb * 4) + (fat * 9)
             total_calories += calories
+            total_protein += protein
+            total_fat += fat
+            total_carb += carb
 
         # 400: Bad Request
         if not names or not weights or not proteins or not fats or not carbs:
@@ -821,7 +827,7 @@ def submit_food():
         image_url = upload_food_image(food_image)
 
         # Store data to Realtime Database
-        store_food_data(user_id, image_url, meal_category, total_calories, foods)
+        store_food_data(user_id, image_url, meal_category, total_calories, total_protein, total_fat, total_carb, foods)
 
         # Return a success response
         response = {
@@ -840,7 +846,7 @@ def submit_food():
         }
         return jsonify(response), 400
 
-
+# DASHBOARD
 @app.route('/master/dashboard', methods=['GET'])
 def get_calories_needed():
     auth_header = request.headers.get('Authorization')

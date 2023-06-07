@@ -86,15 +86,18 @@ def categorize_meal():
     else:
         return "dinner"
 
-def store_food_data(user_id, image_url, meal_category, calories, foods):
+def store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods):
     user_food_ref = db.reference('user_food')
     new_food_entry = user_food_ref.push()
 
     new_food_entry.set({
         'user_id': user_id,
         'image_url': image_url,
+        'category': meal_category,
         'calories': calories,
-        'category': meal_category
+        'proteins': proteins,
+        'fats': fats,
+        'carbs': carbs
     })
 
     for index, label_info in enumerate(foods):
