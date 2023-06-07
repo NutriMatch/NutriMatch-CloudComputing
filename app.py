@@ -706,11 +706,13 @@ def submit_manual():
 
         meal_category = categorize_meal()
 
+        food_title = name
+
         # Upload and retrieve image URL
         image_url = upload_food_image(food_image)
 
         # Store data to Realtime Database
-        store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods)
+        store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods, food_title)
 
         # 200: Success
         response = {
@@ -821,12 +823,14 @@ def submit_food():
             return jsonify(response), 400
 
         meal_category = categorize_meal()
+        
+        food_title = ', '.join(names)
 
         # Upload and retrieve image URL            
         image_url = upload_food_image(food_image)
 
         # Store data to Realtime Database
-        store_food_data(user_id, image_url, meal_category, total_calories, total_protein, total_fat, total_carb, foods)
+        store_food_data(user_id, image_url, meal_category, total_calories, total_protein, total_fat, total_carb, foods, food_title)
 
         # Return a success response
         response = {
@@ -961,7 +965,7 @@ def get_calories_needed():
             category = entry.get('category')
             food_info = {
                 'image_url': entry.get('image_url'),
-                # 'title': entry.get('title'),
+                'title': entry.get('title'),
                 'nutrition_info': {
                     'calories': entry.get('calories', 0),
                     'protein': entry.get('proteins', 0),
@@ -976,7 +980,8 @@ def get_calories_needed():
                 history_food['lunch'].append(food_info)
             elif category == 'dinner':
                 history_food['dinner'].append(food_info)
-
+        
+        # 200: Success
         response = {
             'status': True,
             'message': 'Success get dashboard',
@@ -988,6 +993,7 @@ def get_calories_needed():
         }
         return jsonify(response), 200
 
+    # 401: Unauthorized
     except jwt.exceptions.InvalidTokenError:
         response = {
             'status': False,

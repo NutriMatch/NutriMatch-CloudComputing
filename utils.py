@@ -86,7 +86,7 @@ def categorize_meal():
     else:
         return "dinner"
 
-def store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods):
+def store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods, food_title):
     user_food_ref = db.reference('user_food')
     new_food_entry = user_food_ref.push()
 
@@ -94,6 +94,7 @@ def store_food_data(user_id, image_url, meal_category, calories, proteins, fats,
 
     new_food_entry.set({
         'user_id': user_id,
+        'title': food_title,
         'image_url': image_url,
         'category': meal_category,
         'calories': calories,
