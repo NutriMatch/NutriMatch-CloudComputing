@@ -906,13 +906,11 @@ def get_calories_needed():
             if entry.get('user_id') == user_id and get_date_from_timestamp(entry.get('timestamp')) == today
         ]
 
-        print(user_food_data.values())
-
         # Calculate the sum of calories, proteins, fats, and carbs for today's entries
-        today_calories = sum(entry.get('calories', 0) for entry in today_entries)
-        today_proteins = sum(entry.get('proteins', 0) for entry in today_entries)
-        today_fats = sum(entry.get('fats', 0) for entry in today_entries)
-        today_carbs = sum(entry.get('carbs', 0) for entry in today_entries)
+        today_calories = round(sum(entry.get('calories', 0) for entry in today_entries), 2)
+        today_proteins = round(sum(entry.get('proteins', 0) for entry in today_entries), 2)
+        today_fats = round(sum(entry.get('fats', 0) for entry in today_entries), 2)
+        today_carbs = round(sum(entry.get('carbs', 0) for entry in today_entries), 2)
 
         # Calculation
         # (protein: 10-35% calorie, fat: 20-35%, carbs: 45-65%)
@@ -954,10 +952,30 @@ def get_calories_needed():
         }
 
         history_food = {
-            'breakfast': [{'food1': None}],  # Placeholder, replace with actual food data
-            'lunch': [{'food2': None}],  # Placeholder, replace with actual food data
-            'dinner': [{'food3': None}]  # Placeholder, replace with actual food data
+            'breakfast': [],
+            'lunch': [],
+            'dinner': []
         }
+
+        for entry in today_entries:
+            category = entry.get('category')
+            food_info = {
+                'image_url': entry.get('image_url'),
+                # 'title': entry.get('title'),
+                'nutrition_info': {
+                    'calories': entry.get('calories', 0),
+                    'protein': entry.get('proteins', 0),
+                    'fat': entry.get('fats', 0),
+                    'carbs': entry.get('carbs', 0)
+                }
+            }
+
+            if category == 'breakfast':
+                history_food['breakfast'].append(food_info)
+            elif category == 'lunch':
+                history_food['lunch'].append(food_info)
+            elif category == 'dinner':
+                history_food['dinner'].append(food_info)
 
         response = {
             'status': True,
