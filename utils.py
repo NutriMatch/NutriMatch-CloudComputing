@@ -90,6 +90,8 @@ def store_food_data(user_id, image_url, meal_category, calories, proteins, fats,
     user_food_ref = db.reference('user_food')
     new_food_entry = user_food_ref.push()
 
+    timestamp = datetime.now().isoformat()
+
     new_food_entry.set({
         'user_id': user_id,
         'image_url': image_url,
@@ -97,7 +99,8 @@ def store_food_data(user_id, image_url, meal_category, calories, proteins, fats,
         'calories': calories,
         'proteins': proteins,
         'fats': fats,
-        'carbs': carbs
+        'carbs': carbs,
+        'timestamp': timestamp
     })
 
     for index, label_info in enumerate(foods):
@@ -115,3 +118,12 @@ def upload_food_image(file):
     image_url = blob.public_url
     
     return image_url
+
+def get_date_from_timestamp(timestamp):
+    if timestamp is None:
+        return None
+    try:
+        date = datetime.fromisoformat(timestamp)
+        return date.date().isoformat()
+    except (ValueError, TypeError):
+        return None

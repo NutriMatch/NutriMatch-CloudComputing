@@ -9,7 +9,7 @@ import numpy as np
 from tensorflow.keras.utils import load_img, img_to_array
 from tensorflow.keras.models import load_model
 from PIL import Image
-from datetime import date
+import datetime
 import io
 import requests
 import jwt
@@ -660,13 +660,13 @@ def submit_manual():
                 'data': None
             }
             return jsonify(response), 404
-        
+
         # Request
         food_image = request.files['food_image']
         name = request.form['name']
         weight = request.form['weight']
         calories = request.form['calories']
-        
+
         # 400: Bad Request
         if not name or not weight or not calories:
             response = {
@@ -686,7 +686,6 @@ def submit_manual():
                 'data': None
             }
             return jsonify(response), 400
-        
 
         # Calculate nutrient values based on calorie
         proteins = round(calories * 0.2 / 4, 2)
@@ -694,7 +693,7 @@ def submit_manual():
         fats = round(calories * 0.3 / 9, 2)
 
         meal_category = categorize_meal()
-        
+
         foods = []
         food_info = {
             'name': name,
@@ -704,14 +703,14 @@ def submit_manual():
             'carb': carbs
         }
         foods.append(food_info)
-        
+
         meal_category = categorize_meal()
 
-        # Upload and retrive image URL            
+        # Upload and retrieve image URL
         image_url = upload_food_image(food_image)
 
         # Store data to Realtime Database
-        store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods)  
+        store_food_data(user_id, image_url, meal_category, calories, proteins, fats, carbs, foods)
 
         # 200: Success
         response = {
@@ -850,7 +849,6 @@ def submit_food():
 @app.route('/master/dashboard', methods=['GET'])
 def get_calories_needed():
     auth_header = request.headers.get('Authorization')
-
     # 401: Invalid token
     if not auth_header or not auth_header.startswith('Bearer '):
         response = {
@@ -859,7 +857,6 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
-
     access_token = auth_header.split(' ')[1]
 
     try:
@@ -874,16 +871,6 @@ def get_calories_needed():
         # Get body measurement data
         body_measurement_ref = db.reference('body_measurements')
         query = body_measurement_ref.order_by_child('user_id').equal_to(list(user_data.keys())[0]).get()
-
-        # Check if query is empty
-        if not query:
-            response = {
-                'status': False,
-                'message': 'No body measurement data found',
-                'data': None
-            }
-            return jsonify(response), 404
-
         measurement_id = list(query.keys())[0]
 
         # Data needed for calculation
@@ -897,8 +884,7 @@ def get_calories_needed():
 
         # Calculate calories needed
         age = calculate_age(user_data[user_id]['birthday'])
-        calories_needed = round(calculate_calories_needed(weight, height, age, gender, activity_level), 2)
-
+        calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
         if calories_needed is None:
             response = {
                 'status': False,
@@ -907,65 +893,32 @@ def get_calories_needed():
             }
             return jsonify(response), 500
 
+        # Get today's date
+        today = datetime.date.today().isoformat()
+
+        # Get user food entries for today
+        user_food_ref = db.reference('user_food')
+        user_food_data = user_food_ref.order_by_child('user_id').equal_to(user_id).get()
+
+        # Filter the entries for today
+        today_entries = [
+            entry for entry in user_food_data.values()
+            if entry.get('user_id') == user_id and get_date_from_timestamp(entry.get('timestamp')) == today
+        ]
+
+        print(user_food_data.values())
+
+        # Calculate the sum of calories, proteins, fats, and carbs for today's entries
+        today_calories = sum(entry.get('calories', 0) for entry in today_entries)
+        today_proteins = sum(entry.get('proteins', 0) for entry in today_entries)
+        today_fats = sum(entry.get('fats', 0) for entry in today_entries)
+        today_carbs = sum(entry.get('carbs', 0) for entry in today_entries)
+
         # Calculation
-        # (protein: 10-35% calori, fat: 20-35%, carbs: 45-65%)
+        # (protein: 10-35% calorie, fat: 20-35%, carbs: 45-65%)
         protein = round(calories_needed * 0.2 / 4, 2)
         carbohydrate = round(calories_needed * 0.5 / 4, 2)
         fat = round(calories_needed * 0.3 / 9, 2)
-        
-        # Get today's date
-        today = date.today().isoformat()
-
-        # Retrieve user's food entries for today
-        food_ref = db.reference('user_food')
-        query = food_ref.order_by_child('user_id').equal_to(user_id).get()
-        food_entries = [query[key] for key in query if query[key]['category'] == today]
-
-        # Calculate total calories, protein, carbs, and fat
-        total_calories = sum(entry['calories'] for entry in food_entries)
-        total_protein = sum(entry['food_{}'.format(i)]['protein'] for entry in food_entries for i in range(len(entry)))
-        total_carbs = sum(entry['food_{}'.format(i)]['carb'] for entry in food_entries for i in range(len(entry)))
-        total_fat = sum(entry['food_{}'.format(i)]['fat'] for entry in food_entries for i in range(len(entry)))
-
-        # Assign current values to the graph
-        graph = {
-            'calories': {
-                'target': calories_needed,
-                'current': total_calories
-            },
-            'protein': {
-                'target': protein,
-                'current': total_protein
-            },
-            'fat': {
-                'target': fat,
-                'current': total_fat
-            },
-            'carbs': {
-                'target': carbohydrate,
-                'current': total_carbs
-            }
-        }
-
-        # Prepare the history_food dictionary
-        history_food = {
-            'breakfast': [],
-            'lunch': [],
-            'dinner': []
-        }
-
-        # Filter food entries by category and add to history_food
-        for entry in food_entries:
-            category = entry['category']
-            food_list = []
-            for i in range(len(entry)):
-                key = 'food_{}'.format(i)
-                if key in entry:
-                    food_name = entry[key]['name']
-                    food_list.append({'get_makanan_user': food_name})
-            history_food[category.lower()] = food_list
-
-
 
         # 200: Success
         user_response = {
@@ -974,11 +927,36 @@ def get_calories_needed():
             'email': user_email,
             'birthday': user_data[user_id]['birthday'],
             'body_measurement': {
-                'height': height,
-                'weight': weight,
-                'activity_level': activity_level,
-                'gender': gender
+                'height': query[measurement_id]['height'],
+                'weight': query[measurement_id]['weight'],
+                'activity_level': query[measurement_id]['activity_level'],
+                'gender': query[measurement_id]['gender']
             }
+        }
+
+        graph = {
+            'calories': {
+                'target': calories_needed,
+                'current': today_calories
+            },
+            'protein': {
+                'target': protein,
+                'current': today_proteins
+            },
+            'fat': {
+                'target': fat,
+                'current': today_fats
+            },
+            'carbs': {
+                'target': carbohydrate,
+                'current': today_carbs
+            }
+        }
+
+        history_food = {
+            'breakfast': [{'food1': None}],  # Placeholder, replace with actual food data
+            'lunch': [{'food2': None}],  # Placeholder, replace with actual food data
+            'dinner': [{'food3': None}]  # Placeholder, replace with actual food data
         }
 
         response = {
@@ -999,7 +977,6 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
-
 
 
 
