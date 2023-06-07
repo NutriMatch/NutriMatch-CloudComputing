@@ -81,7 +81,7 @@ def categorize_meal():
     # Categorize the meal based on the time of day
     if current_time < "10:00:00":
         return "breakfast"
-    elif current_time < "15:00:00":
+    elif current_time < "18:00:00":
         return "lunch"
     else:
         return "dinner"
