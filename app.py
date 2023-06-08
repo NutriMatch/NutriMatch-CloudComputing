@@ -888,7 +888,7 @@ def get_calories_needed():
 
         # Calculate calories needed
         age = calculate_age(user_data[user_id]['birthday'])
-        calories_needed = calculate_calories_needed(weight, height, age, gender, activity_level)
+        calories_needed = round(calculate_calories_needed(weight, height, age, gender, activity_level),2)
         if calories_needed is None:
             response = {
                 'status': False,
