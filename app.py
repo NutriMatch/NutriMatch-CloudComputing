@@ -510,7 +510,7 @@ def change_password():
 
 
 # ------------ MASTER --------------
-model = load_model('model.h5')
+model = load_model('modelNew.h5')
 
 # SCAN NUTRITION
 @app.route('/master/scan_nutrition', methods=['POST'])
@@ -553,7 +553,7 @@ def scan_nutrition():
         food_weight = float(request.form['food_weight'])
 
         # Load Image
-        img = load_img(io.BytesIO(food_image.read()), target_size=(150, 150))
+        img = load_img(io.BytesIO(food_image.read()), target_size=(224, 224))
         x = img_to_array(img)
         x /= 255
         x = np.expand_dims(x, axis=0)
