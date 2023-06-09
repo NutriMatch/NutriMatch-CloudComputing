@@ -2,8 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db, auth, storage
-from config import secret_key
-from config import FIREBASE_AUTH_API
+from config import *
 from utils import *
 import numpy as np
 from tensorflow.keras.utils import load_img, img_to_array
@@ -13,6 +12,7 @@ import datetime
 import io
 import requests
 import jwt
+import bcrypt
 
 # Initialize Firebase
 cred = credentials.Certificate('serviceAccountKey1.json')
@@ -453,19 +453,25 @@ def change_password():
         payload = jwt.decode(access_token, secret_key, algorithms=['HS256'])
         user_email = payload['sub']
 
-        old_password = request.form['old_password']
-        new_password = request.form['new_password']
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
 
-        if not new_password:
+        if not old_password or not new_password:
             response = {
                 'status': False,
-                'message': 'New password is required!',
+                'message': 'Old password and new password are required!',
                 'data': None
             }
             return jsonify(response), 400
 
-        user = auth.get_user_by_email(user_email)
-
+        if not verify_old_password(user_email, old_password):
+            response = {
+                'status': False,
+                'message': 'Invalid old password!',
+                'data': None
+            }
+            return jsonify(response), 400
+        
         if old_password == new_password:
             response = {
                 'status': False,
@@ -473,10 +479,28 @@ def change_password():
                 'data': None
             }
             return jsonify(response), 400
+        
+        # 403: Unauthorized
+        if not is_authorized_to_change_password(user_email):
+            response = {
+                'status': False,
+                'message': 'Forbidden!',
+                'data': None
+            }
+            return jsonify(response), 403
 
-        # Change password
+        # 404: User not found
+        user = auth.get_user_by_email(user_email)
+        if not user:
+            response = {
+                'status': False,
+                'message': 'User not found!',
+                'data': None
+            }
+            return jsonify(response), 404
+
+        # 200: Success
         auth.update_user(user.uid, password=new_password)
-
         response = {
             'status': True,
             'message': 'Edit success!',
@@ -484,6 +508,7 @@ def change_password():
         }
         return jsonify(response), 200
 
+    # 401: Invalid token
     except jwt.InvalidTokenError:
         response = {
             'status': False,
@@ -492,14 +517,6 @@ def change_password():
         }
         return jsonify(response), 401
 
-    except firebase_admin.auth.UserNotFoundError:
-        response = {
-            'status': False,
-            'message': 'User not found!',
-            'data': None
-        }
-        return jsonify(response), 404
-    
     except Exception as e:
         response = {
             'status': False,
@@ -987,9 +1004,9 @@ def get_calories_needed():
             'message': 'Success get dashboard',
             'data': {
                 'user': user_response,
-            },
-            'graph': graph,
-            'history_food': history_food
+                'graph': graph,
+                'history_food': history_food
+            }
         }
         return jsonify(response), 200
 

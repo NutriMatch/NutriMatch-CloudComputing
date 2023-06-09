@@ -1,6 +1,8 @@
 import re
 import jwt
+import requests
 from datetime import datetime
+from config import FIREBASE_AUTH_API
 from firebase_admin import db, auth, storage, initialize_app
 
 def is_valid_email(email):
@@ -121,6 +123,7 @@ def upload_food_image(file):
     return image_url
 
 def get_date_from_timestamp(timestamp):
+
     if timestamp is None:
         return None
     try:
@@ -128,3 +131,29 @@ def get_date_from_timestamp(timestamp):
         return date.date().isoformat()
     except (ValueError, TypeError):
         return None
+
+def verify_old_password(email, password):
+    request_data = {
+        'email': email,
+        'password': password,
+        'returnSecureToken': False
+    }
+
+    response = requests.post(FIREBASE_AUTH_API, json=request_data)
+    response_data = response.json()
+
+    if 'idToken' in response_data:
+        return True
+    else:
+        return False
+
+def get_user_role(user_email):
+    if user_email == 'c062dsy0688admin@bangkit.academy':
+        return 'admin'
+    return None
+
+def is_authorized_to_change_password(user_email):
+    user_role = get_user_role(user_email)
+    if user_role == 'admin':
+        return True
+    return False
