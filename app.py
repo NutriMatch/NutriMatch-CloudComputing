@@ -984,10 +984,10 @@ def get_calories_needed():
                 'image_url': entry.get('image_url'),
                 'title': entry.get('title'),
                 'nutrition_info': {
-                    'calories': entry.get('calories', 0),
-                    'protein': entry.get('proteins', 0),
-                    'fat': entry.get('fats', 0),
-                    'carbs': entry.get('carbs', 0)
+                    'calories': round(entry.get('calories', 0), 2),
+                    'protein': round(entry.get('proteins', 0), 2),
+                    'fat': round(entry.get('fats', 0), 2),
+                    'carb': round(entry.get('carbs', 0), 2)
                 }
             }
 
