@@ -146,14 +146,3 @@ def verify_old_password(email, password):
         return True
     else:
         return False
-
-def get_user_role(user_email):
-    if user_email == 'c062dsy0688admin@bangkit.academy':
-        return 'admin'
-    return None
-
-def is_authorized_to_change_password(user_email):
-    user_role = get_user_role(user_email)
-    if user_role == 'admin':
-        return True
-    return False

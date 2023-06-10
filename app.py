@@ -479,15 +479,6 @@ def change_password():
                 'data': None
             }
             return jsonify(response), 400
-        
-        # 403: Unauthorized
-        if not is_authorized_to_change_password(user_email):
-            response = {
-                'status': False,
-                'message': 'Forbidden!',
-                'data': None
-            }
-            return jsonify(response), 403
 
         # 404: User not found
         user = auth.get_user_by_email(user_email)
@@ -1018,8 +1009,6 @@ def get_calories_needed():
             'data': None
         }
         return jsonify(response), 401
-
-
 
 
 # Initialize Flask
