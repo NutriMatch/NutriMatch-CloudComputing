@@ -26,6 +26,12 @@ firebase_admin.initialize_app(cred, {
 app = Flask(__name__)
 CORS(app)
 
+@app.get("/")
+def hello():
+    """Return a friendly HTTP greeting."""
+    who = request.args.get("who", default="World")
+    return f"Hello {who}!\n"
+
 # ------------ AUTH --------------
 # REGISTER
 @app.route('/auth/register', methods=['POST'])
