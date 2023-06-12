@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db, auth, storage
+import tensorflow as tf
 from config import *
 from utils import *
 import numpy as np
@@ -518,7 +519,7 @@ def change_password():
 
 
 # ------------ MASTER --------------
-model = load_model('modelNew.h5')
+model = tf.keras.models.load_model('model.h5', compile=False)
 
 # SCAN NUTRITION
 @app.route('/master/scan_nutrition', methods=['POST'])
@@ -561,7 +562,7 @@ def scan_nutrition():
         food_weight = float(request.form['food_weight'])
 
         # Load Image
-        img = load_img(io.BytesIO(food_image.read()), target_size=(224, 224))
+        img = load_img(io.BytesIO(food_image.read()), target_size=(416, 416))
         x = img_to_array(img)
         x /= 255
         x = np.expand_dims(x, axis=0)
@@ -571,7 +572,7 @@ def scan_nutrition():
         classes = model.predict(images, batch_size=1)
 
         # Detection Confidence
-        threshold = 0.85
+        threshold = 0.8
         class_indices = np.where(classes[0] > threshold)[0]
 
         # Get Detected Label
