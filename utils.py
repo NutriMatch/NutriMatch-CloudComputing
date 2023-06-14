@@ -1,4 +1,6 @@
 import re
+import datetime
+import pytz
 import jwt
 import requests
 from datetime import datetime
@@ -77,9 +79,10 @@ def get_class_labels(class_indices):
     return [class_labels[idx] for idx in class_indices]
 
 def categorize_meal():
-    now = datetime.now()
+    jakarta_timezone = pytz.timezone('Asia/Jakarta')
+    now = datetime.now(jakarta_timezone)
     current_time = now.strftime("%H:%M:%S")
-    
+
     # Categorize the meal based on the time of day
     if current_time < "10:00:00":
         return "breakfast"
@@ -123,12 +126,14 @@ def upload_food_image(file):
     return image_url
 
 def get_date_from_timestamp(timestamp):
-
     if timestamp is None:
         return None
     try:
+        # Set the time zone to WIB
+        jakarta_timezone = pytz.timezone('Asia/Jakarta')
         date = datetime.fromisoformat(timestamp)
-        return date.date().isoformat()
+        localized_date = date.replace(tzinfo=pytz.utc).astimezone(jakarta_timezone)
+        return localized_date.date().isoformat()
     except (ValueError, TypeError):
         return None
 
